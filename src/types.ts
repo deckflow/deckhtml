@@ -21,6 +21,8 @@ export interface ConversionOptions {
   platform?: 'win' | 'mac';
   /** Target language/script for generic font mapping (requires platform). */
   lang?: 'sc' | 'tc' | 'jp' | 'kr' | 'ar' | 'he' | 'latin';
+  /** Suppress non-essential console.log / console.warn output. */
+  quiet?: boolean;
 }
 
 export interface ElementInfo {

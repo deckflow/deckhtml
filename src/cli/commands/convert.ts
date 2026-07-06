@@ -109,6 +109,7 @@ async function runLocalConvert(
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     allowLocalResources: true,
+    quiet: ctx.quiet,
   });
 
   writeFileSync(outputPath, result.data);
@@ -307,7 +308,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
             envelope.report = reportPath;
           }
 
-          printSuccess(envelope, ctx.jsonOutput, ctx.quiet);
+          printSuccess(envelope, ctx.jsonOutput);
           process.exit(0);
         } finally {
           await cleanup();

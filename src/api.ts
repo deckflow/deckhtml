@@ -24,6 +24,7 @@ import {
   parseScriptFontFaces,
 } from './utils/style';
 import { buildPlatformFontContext, PlatformFontContext } from './utils/platformFontMap';
+import { runQuietly } from './utils/quiet';
 
 /**
  * Read SVG viewBox / width+height for viewport auto-sizing.
@@ -284,6 +285,7 @@ function reportUsedFonts(usedFontsDeduped: string[]): void {
 export async function convertHtmlToPptx(
   options: ConversionOptions
 ): Promise<ConversionResult> {
+  return runQuietly(Boolean(options.quiet), async () => {
   const inputPaths = resolveInputPaths(options);
   const platformFontContext = buildPlatformFontContext(options);
   const loader = new HTMLLoader();
@@ -370,6 +372,7 @@ export async function convertHtmlToPptx(
     usedFonts: usedFontsDeduped,
     slideCount,
   };
+  });
 }
 
 export default convertHtmlToPptx;

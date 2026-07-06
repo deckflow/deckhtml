@@ -171,15 +171,10 @@ export interface ConversionResultEnvelope {
 
 export function printSuccess(
   envelope: ConversionResultEnvelope,
-  jsonOutput: boolean,
-  quiet: boolean
+  jsonOutput: boolean
 ): void {
   if (jsonOutput) {
     console.log(JSON.stringify(envelope));
-    return;
-  }
-  if (!quiet) {
-    console.log(envelope.output);
     return;
   }
   console.log(envelope.output);
