@@ -1,0 +1,44 @@
+{
+  "name": "@deckflow/deckhtml",
+  "version": "0.1.0",
+  "description": "Convert HTML to PPTX, PDF, or PNG presentations",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "bin": {
+    "deckhtml": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist/"
+  },
+  "keywords": [
+    "html",
+    "pptx",
+    "powerpoint",
+    "converter",
+    "deckhtml"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@deckops/sdk": "file:../deckops/sdks/typescript",
+    "commander": "^11.1.0",
+    "jszip": "^3.10.1",
+    "mathml2omml": "^0.5.0",
+    "open": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "playwright": "^1.58.1",
+    "pptxgenjs": "^4.0.1",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "playwright": "^1.58.1",
+    "pptxgenjs": "^4.0.1"
+  }
+}
