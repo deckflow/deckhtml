@@ -9,6 +9,56 @@ import { getSlideHeightPx, getSlideWidthPx } from './utils/coordinate';
 import { convertMathmlToOmml } from './utils/mathml-to-omml';
 import { isLightTextColor } from './utils/omml-style';
 
+/** Declarative rule for auto-detecting multi-page slide hosts. */
+export interface SlideProbeRule {
+  /** Human-readable label for logging. */
+  label: string;
+  /** CSS selector for candidate slide hosts. */
+  selector: string;
+  /**
+   * When set, only candidates without an ancestor matching this selector are kept
+   * (e.g. top-level `section` only).
+   */
+  topLevelAncestorSelector?: string;
+}
+
+export interface SlideContainerDiscovery {
+  selector: string;
+  count: number;
+  /** Matched probe rule label, or `explicit` / `none`. */
+  rule?: string;
+}
+
+export interface InspectElementsOptions {
+  inputIsSvg?: boolean;
+}
+
+const SLIDE_INDEX_ATTR = 'data-deckhtml-slide-index';
+const SLIDE_ISOLATION_ATTR = 'data-deckhtml-slide-hidden';
+const SLIDE_CANDIDATE_ATTR = 'data-deckhtml-slide-candidate';
+/** Pause after isolating a slide so CSS/JS entrance animations can finish. */
+const SLIDE_ISOLATION_ANIMATION_SETTLE_MS = 3000;
+/** Qualified slide host height must be within [min, max] × viewport slide height. */
+const SLIDE_HEIGHT_MIN_RATIO = 0.5;
+const SLIDE_HEIGHT_MAX_RATIO = 2.0;
+const SLIDE_MIN_MATCHES = 2;
+
+/**
+ * Ordered probe rules for multi-page HTML. First rule with enough qualified
+ * candidates wins; all matches share the same height check, isolation, and inspect pipeline.
+ */
+export const SLIDE_PROBE_RULES: SlideProbeRule[] = [
+  { label: '.slide-container', selector: '.slide-container' },
+  { label: '.slide', selector: '.slide' },
+  { label: '[data-slide]', selector: '[data-slide]' },
+  { label: 'section.slide', selector: 'section.slide' },
+  {
+    label: 'section',
+    selector: 'section',
+    topLevelAncestorSelector: 'section',
+  },
+];
+
 export class ElementInspector {
   private page: Page;
 
@@ -216,11 +266,388 @@ export class ElementInspector {
   }
 
   /**
+   * Discover slide container elements in the page.
+   * Tags each match with data-deckhtml-slide-index for stable isolation.
+   */
+  async discoverSlideContainers(
+    selector?: string,
+    autoDetect: boolean = true
+  ): Promise<SlideContainerDiscovery> {
+    const explicit = selector?.trim() || '';
+    if (explicit) {
+      return this.page.evaluate(
+        ({ explicitSelector, indexAttr }) => {
+          const nodes = Array.from(document.querySelectorAll(explicitSelector));
+          nodes.forEach((node, i) => node.setAttribute(indexAttr, String(i)));
+          return {
+            selector: explicitSelector,
+            count: nodes.length,
+            rule: 'explicit',
+          };
+        },
+        { explicitSelector: explicit, indexAttr: SLIDE_INDEX_ATTR }
+      );
+    }
+
+    if (autoDetect) {
+      return this.discoverByProbeRules();
+    }
+
+    return this.emptySlideDiscovery();
+  }
+
+  private emptySlideDiscovery(): SlideContainerDiscovery {
+    return { selector: '', count: 0, rule: 'none' };
+  }
+
+  /**
+   * Try each {@link SLIDE_PROBE_RULES} entry in order; tag qualified hosts and
+   * return a selector that matches only those tagged nodes.
+   */
+  private async discoverByProbeRules(): Promise<SlideContainerDiscovery> {
+    const slideHeight = getSlideHeightPx();
+
+    for (const rule of SLIDE_PROBE_RULES) {
+      const candidateCount = await this.page.evaluate(
+        ({ probeRule, candidateAttr }) => {
+          document.querySelectorAll(`[${candidateAttr}]`).forEach((node) => {
+            node.removeAttribute(candidateAttr);
+          });
+          let nodes = Array.from(document.querySelectorAll(probeRule.selector));
+          if (probeRule.topLevelAncestorSelector) {
+            nodes = nodes.filter(
+              (node) =>
+                !node.parentElement?.closest(probeRule.topLevelAncestorSelector!)
+            );
+          }
+          nodes.forEach((node, i) => node.setAttribute(candidateAttr, String(i)));
+          return nodes.length;
+        },
+        { probeRule: rule, candidateAttr: SLIDE_CANDIDATE_ATTR }
+      );
+
+      if (candidateCount < SLIDE_MIN_MATCHES) {
+        await this.cleanupSlideCandidates();
+        continue;
+      }
+
+      const discovery = await this.finalizeSlidesFromProbeParents(
+        rule.label,
+        slideHeight
+      );
+
+      if (discovery.count >= SLIDE_MIN_MATCHES) {
+        return discovery;
+      }
+
+      await this.cleanupSlideCandidates();
+    }
+
+    return this.emptySlideDiscovery();
+  }
+
+  /**
+   * Probe matches locate slide parent(s); qualify every direct child whose height
+   * is within [50%, 200%] × slide height (includes siblings not matched by probe,
+   * e.g. header.hero next to section).
+   */
+  private async finalizeSlidesFromProbeParents(
+    ruleLabel: string,
+    slideHeight: number
+  ): Promise<SlideContainerDiscovery> {
+    const minH = slideHeight * SLIDE_HEIGHT_MIN_RATIO;
+    const maxH = slideHeight * SLIDE_HEIGHT_MAX_RATIO;
+
+    return this.page.evaluate(
+      ({ candidateAttr, indexAttr, ruleLabel, minH, maxH }) => {
+        const candidates = Array.from(
+          document.querySelectorAll(`[${candidateAttr}]`)
+        );
+        const seenParents = new Set<Element>();
+        const parents: Element[] = [];
+        for (const candidate of candidates) {
+          const parent = candidate.parentElement;
+          if (!parent || seenParents.has(parent)) continue;
+          seenParents.add(parent);
+          parents.push(parent);
+        }
+        parents.sort((a, b) => {
+          const pos = a.compareDocumentPosition(b);
+          if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+          if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+          return 0;
+        });
+
+        const qualified: Element[] = [];
+        for (const parent of parents) {
+          for (const child of Array.from(parent.children)) {
+            const h = child.getBoundingClientRect().height;
+            if (h >= minH && h <= maxH) qualified.push(child);
+          }
+        }
+
+        document.querySelectorAll(`[${indexAttr}]`).forEach((node) => {
+          node.removeAttribute(indexAttr);
+        });
+        qualified.forEach((node, slideIdx) => {
+          node.setAttribute(indexAttr, String(slideIdx));
+        });
+        document.querySelectorAll(`[${candidateAttr}]`).forEach((node) => {
+          node.removeAttribute(candidateAttr);
+        });
+
+        return {
+          selector: `[${indexAttr}]`,
+          count: qualified.length,
+          rule: ruleLabel,
+        };
+      },
+      {
+        candidateAttr: SLIDE_CANDIDATE_ATTR,
+        indexAttr: SLIDE_INDEX_ATTR,
+        ruleLabel,
+        minH,
+        maxH,
+      }
+    );
+  }
+
+  private async cleanupSlideCandidates(): Promise<void> {
+    await this.page.evaluate(
+      (candidateAttr) => {
+        document.querySelectorAll(`[${candidateAttr}]`).forEach((node) => {
+          node.removeAttribute(candidateAttr);
+        });
+      },
+      SLIDE_CANDIDATE_ATTR
+    );
+  }
+
+  private async waitForLayoutSettle(): Promise<void> {
+    await this.page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        })
+    );
+    await this.page.waitForTimeout(50);
+  }
+
+  /** Wait for slide-local animations after isolation before element inspect. */
+  private async waitForSlideAnimationSettle(): Promise<void> {
+    await this.page.waitForTimeout(SLIDE_ISOLATION_ANIMATION_SETTLE_MS);
+  }
+
+  /**
+   * Multi-slide preprocessing: hide every node outside the slide container
+   * (keep the container, its descendants, and ancestor chain visible).
+   */
+  private async isolateOutsideSlideContainer(
+    slideSelector: string
+  ): Promise<void> {
+    await this.page.evaluate(
+      ({ slideSelector, hiddenAttr }) => {
+        const host = document.querySelector(slideSelector);
+        if (!host) return;
+
+        const hideNode = (node: Element) => {
+          if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
+          node.setAttribute(hiddenAttr, '1');
+          (node as HTMLElement).style.setProperty('display', 'none', 'important');
+        };
+
+        const shouldKeepVisible = (node: Element): boolean => {
+          if (node === host || host.contains(node)) return true;
+          if (node.contains(host)) return true;
+          return false;
+        };
+
+        const roots: Element[] = [];
+        if (document.body) roots.push(document.body);
+        if (document.documentElement && document.documentElement !== document.body) {
+          roots.push(document.documentElement);
+        }
+
+        for (const root of roots) {
+          for (const node of Array.from(root.querySelectorAll('*'))) {
+            if (shouldKeepVisible(node)) continue;
+            hideNode(node);
+          }
+        }
+
+        if (document.body) {
+          for (const child of Array.from(document.body.children)) {
+            if (shouldKeepVisible(child)) continue;
+            hideNode(child);
+          }
+        }
+
+        window.scrollTo(0, 0);
+      },
+      { slideSelector, hiddenAttr: SLIDE_ISOLATION_ATTR }
+    );
+    await this.prepareSlideContainerForInspect(slideSelector);
+    await this.waitForLayoutSettle();
+    await this.waitForSlideAnimationSettle();
+  }
+
+  /** Scroll-reveal hooks leave `.reveal` at opacity:0 until scrolled; fix before inspect. */
+  private async prepareSlideContainerForInspect(
+    slideSelector: string
+  ): Promise<void> {
+    await this.page.evaluate((sel) => {
+      const host = document.querySelector(sel);
+      if (!(host instanceof HTMLElement)) return;
+      host.scrollIntoView({ block: 'start', inline: 'nearest' });
+      const nodes = [
+        host,
+        ...Array.from(host.querySelectorAll('.reveal')),
+      ].filter((n): n is HTMLElement => n instanceof HTMLElement);
+      for (const node of nodes) {
+        node.classList.add('show');
+        node.style.setProperty('transition', 'none', 'important');
+        node.style.setProperty('animation', 'none', 'important');
+        node.style.setProperty('opacity', '1', 'important');
+        node.style.setProperty('transform', 'none', 'important');
+      }
+    }, slideSelector);
+  }
+
+  private async clearPptxMappedAttributes(): Promise<void> {
+    await this.page.evaluate((mappedAttr) => {
+      document.querySelectorAll(`[${mappedAttr}]`).forEach((node) => {
+        node.removeAttribute(mappedAttr);
+      });
+    }, 'data-html2pptx-mapped');
+  }
+
+  private async restoreSlideIsolation(): Promise<void> {
+    await this.page.evaluate(
+      (hiddenAttr) => {
+        document.querySelectorAll(`[${hiddenAttr}]`).forEach((node) => {
+          if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
+          (node as HTMLElement).style.removeProperty('display');
+          node.removeAttribute(hiddenAttr);
+        });
+      },
+      SLIDE_ISOLATION_ATTR
+    );
+  }
+
+  private async cleanupSlideContainerTags(): Promise<void> {
+    await this.page.evaluate(
+      (indexAttr) => {
+        document.querySelectorAll(`[${indexAttr}]`).forEach((node) => {
+          node.removeAttribute(indexAttr);
+        });
+      },
+      SLIDE_INDEX_ATTR
+    );
+  }
+
+  private async getSlideContainerOrigin(
+    slideIndex: number,
+    selector: string
+  ): Promise<{ x: number; y: number }> {
+    return this.page.evaluate(
+      ({ slideIndex, selector, indexAttr }) => {
+        const node = document.querySelector(
+          `${selector}[${indexAttr}="${slideIndex}"]`
+        ) ?? document.querySelectorAll(selector)[slideIndex];
+        if (!node) return { x: 0, y: 0 };
+        const rect = node.getBoundingClientRect();
+        return { x: 0, y: rect.top };
+      },
+      { slideIndex, selector, indexAttr: SLIDE_INDEX_ATTR }
+    );
+  }
+
+  private normalizeElementCoords(
+    elements: ElementInfo[],
+    origin: { x: number; y: number }
+  ): void {
+    if (origin.y === 0) return;
+    for (const el of elements) {
+      el.y -= origin.y;
+    }
+  }
+
+  /**
+   * Body page-bg is emitted at the viewport origin (0,0). After subtracting the
+   * slide container origin it drifts off-slide and PowerPoint prompts for repair.
+   */
+  private anchorFullSlidePageBg(elements: ElementInfo[]): void {
+    const w = getSlideWidthPx();
+    const h = getSlideHeightPx();
+    for (const el of elements) {
+      if (el.tag !== 'body.page-bg') continue;
+      el.x = 0;
+      el.y = 0;
+      el.width = w;
+      el.height = h;
+    }
+  }
+
+  /**
+   * Inspect one slide after isolation (multi-slide path).
+   */
+  async inspectOneSlideIsolated(
+    slideIndex: number,
+    discovery: SlideContainerDiscovery,
+    options?: InspectElementsOptions
+  ): Promise<ElementInfo[]> {
+    const slideSelector = `[${SLIDE_INDEX_ATTR}="${slideIndex}"]`;
+    await this.clearPptxMappedAttributes();
+    await this.isolateOutsideSlideContainer(slideSelector);
+    const origin = await this.getSlideContainerOrigin(slideIndex, discovery.selector);
+    const elements = await this.inspectElements(undefined, options);
+    this.normalizeElementCoords(elements, origin);
+    this.anchorFullSlidePageBg(elements);
+
+    if (elements.length === 0) {
+      elements.push({
+        type: 'text',
+        tag: 'p',
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        styles: {},
+        content: '',
+      });
+    }
+
+    return elements;
+  }
+
+  /**
+   * Inspect each slide container in isolation and return per-slide element maps.
+   */
+  async inspectSlidesIsolated(
+    discovery: SlideContainerDiscovery,
+    options?: InspectElementsOptions
+  ): Promise<Map<number, ElementInfo[]>> {
+    const slidesMap = new Map<number, ElementInfo[]>();
+
+    for (let i = 0; i < discovery.count; i++) {
+      try {
+        const elements = await this.inspectOneSlideIsolated(i, discovery, options);
+        slidesMap.set(i, elements);
+      } finally {
+        await this.restoreSlideIsolation();
+      }
+    }
+
+    await this.cleanupSlideContainerTags();
+    return slidesMap;
+  }
+
+  /**
    * Inspect all visible elements in the page
    */
   async inspectElements(
     slideSelector?: string,
-    options?: { inputIsSvg?: boolean }
+    options?: InspectElementsOptions
   ): Promise<ElementInfo[]> {
     const inputIsSvg = options?.inputIsSvg ?? false;
     const elements = await this.page.evaluate(

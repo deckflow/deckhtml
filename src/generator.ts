@@ -22,6 +22,8 @@ export interface PPTXGeneratorOptions {
   splitByHeight?: boolean;
   /** CSS selector grouping multiple slides in one HTML file. */
   slideSelector?: string;
+  /** Coordinates already normalized per slide (multi-slide isolation path). */
+  slideCoordsNormalized?: boolean;
 }
 
 export class PPTXGenerator {
@@ -29,6 +31,7 @@ export class PPTXGenerator {
   private converter: ElementConverter;
   private splitByHeight: boolean;
   private slideSelector?: string;
+  private slideCoordsNormalized: boolean;
   private registry: StyleEnhancementRegistry;
 
   constructor(options: PPTXGeneratorOptions = {}) {
@@ -50,6 +53,7 @@ export class PPTXGenerator {
     this.pptx.layout = 'HTML_LAYOUT';
     this.splitByHeight = options.splitByHeight ?? false;
     this.slideSelector = options.slideSelector;
+    this.slideCoordsNormalized = options.slideCoordsNormalized ?? false;
   }
 
   /**
@@ -520,6 +524,9 @@ export class PPTXGenerator {
    * Top Y origin for converting element coordinates on this slide.
    */
   private resolveSlideStartY(elements: ElementInfo[], slideIndex: number): number {
+    if (this.slideCoordsNormalized) {
+      return 0;
+    }
     if (this.splitByHeight) {
       return slideIndex * getSlideHeightPx();
     }

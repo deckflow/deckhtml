@@ -54,31 +54,49 @@ export class HTMLLoader {
       throw new Error('Browser not initialized. Call init() first.');
     }
 
-    // Create new page
     this.page = await this.browser.newPage();
+    await this.prepareLoadedPage(this.page, inputPath, viewport, options);
+    return this.page;
+  }
 
+  /**
+   * Open a new Playwright page, load HTML, and return it (caller closes the page).
+   */
+  async loadHTMLInNewPage(
+    inputPath: string,
+    viewport?: { width: number; height: number },
+    options?: { allowLocalResources?: boolean }
+  ): Promise<Page> {
+    if (!this.browser) {
+      throw new Error('Browser not initialized. Call init() first.');
+    }
+
+    const page = await this.browser.newPage();
+    await this.prepareLoadedPage(page, inputPath, viewport, options);
+    return page;
+  }
+
+  private async prepareLoadedPage(
+    page: Page,
+    inputPath: string,
+    viewport?: { width: number; height: number },
+    options?: { allowLocalResources?: boolean }
+  ): Promise<void> {
     const w = viewport?.width ?? getSlideWidthPx();
     const h = viewport?.height ?? getSlideHeightPx();
-    await this.page.setViewportSize({ width: w, height: h });
+    await page.setViewportSize({ width: w, height: h });
 
-    const { documentUrl } = await setupResourcePolicyOnPage(this.page, inputPath, {
+    const { documentUrl } = await setupResourcePolicyOnPage(page, inputPath, {
       allowLocalResources: options?.allowLocalResources,
     });
 
-    await this.page.goto(documentUrl, {
+    await page.goto(documentUrl, {
       waitUntil: 'networkidle',
       timeout: 30000,
     });
 
-    // Wait for fonts and external resources to load
-    await this.page.evaluate(() => {
-      return document.fonts.ready;
-    });
-
-    // Wait for any animations or dynamic content
-    await this.page.waitForTimeout(2000);
-
-    return this.page;
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(2000);
   }
 
   /**

@@ -12,8 +12,10 @@ import {
 } from './types';
 import { HTMLLoader } from './loader';
 import { ElementInspector } from './inspector';
+import { inspectSlidesParallel } from './multi-slide-inspect';
 import { PPTXGenerator } from './generator';
 import { setViewportPixels } from './utils/coordinate';
+import { resolveSlideInspectConcurrency, runAsyncPool } from './utils/async-pool';
 import { isChineseFont } from './utils/chineseFonts';
 import {
   isBold,
@@ -124,6 +126,12 @@ function collectFontsFromElements(
 
 interface ProcessSingleInputResult {
   slidesMap: Map<number, ElementInfo[]>;
+  slideCoordsNormalized: boolean;
+}
+
+interface ProcessSingleInputRuntime {
+  /** Cap in-file slide parallelism when multiple HTML files run concurrently. */
+  slideInspectConcurrency?: number;
 }
 
 async function processSingleInput(
@@ -131,7 +139,8 @@ async function processSingleInput(
   inputPath: string,
   options: ConversionOptions,
   platformFontContext: PlatformFontContext | undefined,
-  usedFontsMap: Map<string, UsedFontDescriptor>
+  usedFontsMap: Map<string, UsedFontDescriptor>,
+  runtime?: ProcessSingleInputRuntime
 ): Promise<ProcessSingleInputResult> {
   const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
   const viewport = resolveViewportForInput(inputPath, options);
@@ -171,32 +180,77 @@ async function processSingleInput(
     }
 
     const inspector = new ElementInspector(page);
-    const elements = await inspector.inspectElements(options.slideSelector, {
-      inputIsSvg,
-    });
-
-    if (elements.length === 0) {
-      elements.push({
-        type: 'text',
-        tag: 'p',
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        styles: {},
-        content: '',
-      });
-    }
-
-    collectFontsFromElements(elements, platformFontContext, usedFontsMap);
-
-    const slidesMap = await inspector.detectSlides(
-      elements,
+    const autoDetect = options.autoDetectSlides !== false;
+    const discovered = await inspector.discoverSlideContainers(
       options.slideSelector,
-      options.splitByHeight
+      autoDetect
     );
 
-    return { slidesMap };
+    let slidesMap: Map<number, ElementInfo[]>;
+    let slideCoordsNormalized = false;
+
+    if (discovered.count >= 2) {
+      if (options.splitByHeight) {
+        console.warn(
+          '⚠️  splitByHeight is ignored when multiple slide containers are detected.'
+        );
+      }
+      const ruleHint = discovered.rule ?? discovered.selector;
+      console.log(`📑 Multi-slide mode: ${discovered.count} pages (rule: ${ruleHint})`);
+
+      const inspectOptions = { inputIsSvg };
+      const slideConcurrency =
+        runtime?.slideInspectConcurrency ?? resolveSlideInspectConcurrency();
+      if (slideConcurrency > 1 && discovered.count > 1) {
+        console.log(
+          `⚡ Parallel inspect: ${slideConcurrency} Playwright pages (CPU cores − 2)`
+        );
+        await loader.close().catch(() => {});
+        slidesMap = await inspectSlidesParallel(loader, {
+          inputPath,
+          viewport,
+          allowLocalResources: options.allowLocalResources,
+          slideSelector: options.slideSelector,
+          autoDetectSlides: autoDetect,
+          discovery: discovered,
+          inspectOptions,
+          concurrency: slideConcurrency,
+        });
+      } else {
+        slidesMap = await inspector.inspectSlidesIsolated(discovered, inspectOptions);
+      }
+      slideCoordsNormalized = true;
+      for (const elements of slidesMap.values()) {
+        collectFontsFromElements(elements, platformFontContext, usedFontsMap);
+      }
+    } else {
+      const elements = await inspector.inspectElements(options.slideSelector, {
+        inputIsSvg,
+      });
+
+      if (elements.length === 0) {
+        elements.push({
+          type: 'text',
+          tag: 'p',
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          styles: {},
+          content: '',
+        });
+      }
+
+      collectFontsFromElements(elements, platformFontContext, usedFontsMap);
+
+      slidesMap = await inspector.detectSlides(
+        elements,
+        options.slideSelector,
+        options.splitByHeight
+      );
+    }
+
+    return { slidesMap, slideCoordsNormalized };
   } finally {
     await loader.close().catch(() => {});
   }
@@ -235,24 +289,67 @@ export async function convertHtmlToPptx(
   const loader = new HTMLLoader();
   const mergedSlidesMap = new Map<number, ElementInfo[]>();
   const usedFontsMap = new Map<string, UsedFontDescriptor>();
+  let slideCoordsNormalized = false;
 
   await loader.init();
 
-  let slideOffset = 0;
-  for (let i = 0; i < inputPaths.length; i++) {
-    const inputPath = inputPaths[i];
-    if (inputPaths.length > 1) {
-      console.log(`\n📄 Processing ${i + 1}/${inputPaths.length}: ${inputPath}`);
-    }
+  const inspectConcurrency = resolveSlideInspectConcurrency();
+  const parallelInputs = inputPaths.length > 1 && inspectConcurrency > 1;
 
-    const { slidesMap } = await processSingleInput(
-      loader,
-      inputPath,
-      options,
-      platformFontContext,
-      usedFontsMap
+  if (parallelInputs) {
+    const fileConcurrency = Math.min(inspectConcurrency, inputPaths.length);
+    console.log(
+      `⚡ Parallel inputs: ${fileConcurrency} HTML files at a time (CPU cores − 2)`
     );
-    slideOffset = mergeSlidesMaps(mergedSlidesMap, slidesMap, slideOffset);
+
+    const indexed = inputPaths.map((path, index) => ({ path, index }));
+    const completed = await runAsyncPool(
+      indexed,
+      fileConcurrency,
+      async ({ path, index }) => {
+        console.log(`\n📄 Processing ${index + 1}/${inputPaths.length}: ${path}`);
+        const fileLoader = new HTMLLoader();
+        await fileLoader.init();
+        try {
+          const result = await processSingleInput(
+            fileLoader,
+            path,
+            options,
+            platformFontContext,
+            usedFontsMap,
+            { slideInspectConcurrency: 1 }
+          );
+          return { index, result };
+        } finally {
+          await fileLoader.close().catch(() => {});
+        }
+      }
+    );
+
+    completed.sort((a, b) => a.index - b.index);
+    let slideOffset = 0;
+    for (const { result } of completed) {
+      slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
+      slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
+    }
+  } else {
+    let slideOffset = 0;
+    for (let i = 0; i < inputPaths.length; i++) {
+      const inputPath = inputPaths[i];
+      if (inputPaths.length > 1) {
+        console.log(`\n📄 Processing ${i + 1}/${inputPaths.length}: ${inputPath}`);
+      }
+
+      const result = await processSingleInput(
+        loader,
+        inputPath,
+        options,
+        platformFontContext,
+        usedFontsMap
+      );
+      slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
+      slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
+    }
   }
 
   const usedFontsDeduped = [...new Set(Array.from(usedFontsMap.values()).map((d) => d.fontFamily))].sort();
@@ -261,6 +358,7 @@ export async function convertHtmlToPptx(
     platformFontContext,
     splitByHeight: options.splitByHeight,
     slideSelector: options.slideSelector,
+    slideCoordsNormalized,
   });
   const data = await generator.generate(mergedSlidesMap);
   const slideCount = generator.getSlideCount();

@@ -9,6 +9,8 @@ export interface ConversionOptions {
   inputs?: string[];
   slideSelector?: string;
   splitByHeight?: boolean;
+  /** Auto-detect multi-slide containers in one HTML file (default true). */
+  autoDetectSlides?: boolean;
   /** Browser viewport width in pixels (default 1280). Must match how the HTML is laid out. */
   viewportWidth?: number;
   /** Browser viewport height in pixels (default 720). */
