@@ -3,7 +3,10 @@
  */
 
 export interface ConversionOptions {
-  input: string;
+  /** Single HTML/SVG input file */
+  input?: string;
+  /** Multiple HTML/SVG input files — processed in order, merged into one PPTX */
+  inputs?: string[];
   slideSelector?: string;
   splitByHeight?: boolean;
   /** Browser viewport width in pixels (default 1280). Must match how the HTML is laid out. */

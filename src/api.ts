@@ -4,7 +4,12 @@
  */
 
 import { readFileSync } from 'fs';
-import { ConversionOptions, ConversionResult, UsedFontDescriptor } from './types';
+import {
+  ConversionOptions,
+  ConversionResult,
+  ElementInfo,
+  UsedFontDescriptor,
+} from './types';
 import { HTMLLoader } from './loader';
 import { ElementInspector } from './inspector';
 import { PPTXGenerator } from './generator';
@@ -16,7 +21,7 @@ import {
   normalizeFontAwesomeFreeFamily,
   parseScriptFontFaces,
 } from './utils/style';
-import { buildPlatformFontContext } from './utils/platformFontMap';
+import { buildPlatformFontContext, PlatformFontContext } from './utils/platformFontMap';
 
 /**
  * Read SVG viewBox / width+height for viewport auto-sizing.
@@ -42,42 +47,105 @@ function parseSvgViewport(inputPath: string): { width: number; height: number } 
   return null;
 }
 
-/**
- * Convert HTML to PPTX
- */
-export async function convertHtmlToPptx(
-  options: ConversionOptions
-): Promise<ConversionResult> {
-  const loader = new HTMLLoader();
+function resolveInputPaths(options: ConversionOptions): string[] {
+  if (options.inputs?.length) return options.inputs;
+  if (options.input) return [options.input];
+  throw new Error('At least one input file is required (use input or inputs).');
+}
 
-  const inputIsSvg = options.input.toLowerCase().endsWith('.svg');
+function resolveViewportForInput(
+  inputPath: string,
+  options: ConversionOptions
+): { width: number; height: number } {
+  const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
   let viewportWidth = options.viewportWidth;
   let viewportHeight = options.viewportHeight;
   if (inputIsSvg && viewportWidth === undefined && viewportHeight === undefined) {
-    const svgViewport = parseSvgViewport(options.input);
+    const svgViewport = parseSvgViewport(inputPath);
     if (svgViewport) {
       viewportWidth = svgViewport.width;
       viewportHeight = svgViewport.height;
     }
   }
-  viewportWidth ??= 1280;
-  viewportHeight ??= 720;
-  setViewportPixels(viewportWidth, viewportHeight);
+  return {
+    width: viewportWidth ?? 1280,
+    height: viewportHeight ?? 720,
+  };
+}
 
-  await loader.init();
+function collectFontsFromElements(
+  elements: ElementInfo[],
+  platformFontContext: PlatformFontContext | undefined,
+  usedFontsMap: Map<string, UsedFontDescriptor>
+): void {
+  const documentUsesChineseFont = elements.some(
+    (el) =>
+      isChineseFont(el.styles?.fontFamily ?? '') ||
+      el.richText?.some((run) => isChineseFont(run.styles?.fontFamily ?? ''))
+  );
+
+  const registerFont = (fontFamily: string, styles: ElementInfo['styles'], boldOverride?: boolean) => {
+    if (!fontFamily) return;
+    const bold = boldOverride ?? isBold(styles.fontWeight);
+    const italic = isItalic(styles.fontStyle);
+    const key = `${fontFamily}|${bold}|${italic}`;
+    if (usedFontsMap.has(key)) return;
+    usedFontsMap.set(key, { fontFamily, bold, italic });
+  };
+
+  const addFont = (styles: ElementInfo['styles']) => {
+    if (!styles?.fontFamily) return;
+    const faFreeFace = normalizeFontAwesomeFreeFamily(
+      styles.fontFamily,
+      styles.fontWeight?.toString()
+    );
+    if (faFreeFace) {
+      registerFont(faFreeFace, styles, false);
+      return;
+    }
+    const stackHasChinese = isChineseFont(styles.fontFamily);
+    if (!stackHasChinese && documentUsesChineseFont) return;
+
+    const faces = parseScriptFontFaces(styles.fontFamily, {
+      platformFontContext,
+      specifiedFontFamily: styles.fontFamilySpecified,
+    });
+    registerFont(faces.latin, styles);
+    if (stackHasChinese && faces.ea !== faces.latin) {
+      registerFont(faces.ea, styles);
+    }
+  };
+
+  elements.forEach((el) => {
+    addFont(el.styles);
+    el.richText?.forEach((run) => addFont(run.styles));
+  });
+}
+
+interface ProcessSingleInputResult {
+  slidesMap: Map<number, ElementInfo[]>;
+}
+
+async function processSingleInput(
+  loader: HTMLLoader,
+  inputPath: string,
+  options: ConversionOptions,
+  platformFontContext: PlatformFontContext | undefined,
+  usedFontsMap: Map<string, UsedFontDescriptor>
+): Promise<ProcessSingleInputResult> {
+  const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
+  const viewport = resolveViewportForInput(inputPath, options);
+  setViewportPixels(viewport.width, viewport.height);
+
+  const page = await loader.loadHTML(
+    inputPath,
+    viewport,
+    {
+      allowLocalResources: options.allowLocalResources,
+    }
+  );
 
   try {
-    const page = await loader.loadHTML(
-      options.input,
-      {
-        width: viewportWidth,
-        height: viewportHeight,
-      },
-      {
-        allowLocalResources: options.allowLocalResources,
-      }
-    );
-
     if (inputIsSvg) {
       const svgValidation = await page.evaluate(() => {
         const parserError = document.querySelector('parsererror');
@@ -103,12 +171,9 @@ export async function convertHtmlToPptx(
     }
 
     const inspector = new ElementInspector(page);
-
     const elements = await inspector.inspectElements(options.slideSelector, {
       inputIsSvg,
     });
-
-    const platformFontContext = buildPlatformFontContext(options);
 
     if (elements.length === 0) {
       elements.push({
@@ -120,51 +185,10 @@ export async function convertHtmlToPptx(
         height: 0,
         styles: {},
         content: '',
-      })
+      });
     }
 
-    const documentUsesChineseFont = elements.some(
-      (el: any) =>
-        isChineseFont(el.styles?.fontFamily ?? '') ||
-        el.richText?.some((run: any) => isChineseFont(run.styles?.fontFamily ?? ''))
-    );
-    const usedFontsMap = new Map<string, UsedFontDescriptor>();
-    const registerFont = (fontFamily: string, styles: any, boldOverride?: boolean) => {
-      if (!fontFamily) return;
-      const bold = boldOverride ?? isBold(styles.fontWeight);
-      const italic = isItalic(styles.fontStyle);
-      const key = `${fontFamily}|${bold}|${italic}`;
-      if (usedFontsMap.has(key)) return;
-      usedFontsMap.set(key, { fontFamily, bold, italic });
-    };
-    const addFont = (styles: any) => {
-      if (!styles?.fontFamily) return;
-      const faFreeFace = normalizeFontAwesomeFreeFamily(
-        styles.fontFamily,
-        styles.fontWeight?.toString()
-      );
-      if (faFreeFace) {
-        registerFont(faFreeFace, styles, false);
-        return;
-      }
-      const stackHasChinese = isChineseFont(styles.fontFamily);
-      if (!stackHasChinese && documentUsesChineseFont) return;
-
-      const faces = parseScriptFontFaces(styles.fontFamily, {
-        platformFontContext,
-        specifiedFontFamily: styles.fontFamilySpecified,
-      });
-      registerFont(faces.latin, styles);
-      if (stackHasChinese && faces.ea !== faces.latin) {
-        registerFont(faces.ea, styles);
-      }
-    };
-    elements.forEach((el: any) => {
-      addFont(el.styles);
-      el.richText?.forEach((run: any) => addFont(run.styles));
-    });
-    const usedFontsList = Array.from(usedFontsMap.values());
-    const usedFontsDeduped = [...new Set(usedFontsList.map((d) => d.fontFamily))].sort();
+    collectFontsFromElements(elements, platformFontContext, usedFontsMap);
 
     const slidesMap = await inspector.detectSlides(
       elements,
@@ -172,27 +196,82 @@ export async function convertHtmlToPptx(
       options.splitByHeight
     );
 
-    const generator = new PPTXGenerator({ platformFontContext });
-    const data = await generator.generate(slidesMap);
-
-    const slideCount = generator.getSlideCount();
-
-    if (usedFontsDeduped.length > 0) {
-      console.log(`\n📝 Fonts used in this presentation:`);
-      usedFontsDeduped.forEach(name => {
-        console.log(`  - ${name}`);
-      });
-      console.log('\n💡 Make sure these fonts are installed on the system where the PPTX will be opened.\n');
-    }
-
-    return {
-      data,
-      usedFonts: usedFontsDeduped,
-      slideCount,
-    };
+    return { slidesMap };
   } finally {
     await loader.close().catch(() => {});
   }
+}
+
+function mergeSlidesMaps(
+  target: Map<number, ElementInfo[]>,
+  source: Map<number, ElementInfo[]>,
+  slideOffset: number
+): number {
+  for (const [idx, elements] of source) {
+    target.set(slideOffset + idx, elements);
+  }
+  return slideOffset + source.size;
+}
+
+function reportUsedFonts(usedFontsDeduped: string[]): void {
+  if (usedFontsDeduped.length === 0) return;
+  console.log(`\n📝 Fonts used in this presentation:`);
+  usedFontsDeduped.forEach((name) => {
+    console.log(`  - ${name}`);
+  });
+  console.log('\n💡 Make sure these fonts are installed on the system where the PPTX will be opened.\n');
+}
+
+/**
+ * Convert one or more HTML/SVG files to a single PPTX.
+ * Each input file becomes one slide by default; use slideSelector or splitByHeight
+ * within a file to produce multiple slides from that file.
+ */
+export async function convertHtmlToPptx(
+  options: ConversionOptions
+): Promise<ConversionResult> {
+  const inputPaths = resolveInputPaths(options);
+  const platformFontContext = buildPlatformFontContext(options);
+  const loader = new HTMLLoader();
+  const mergedSlidesMap = new Map<number, ElementInfo[]>();
+  const usedFontsMap = new Map<string, UsedFontDescriptor>();
+
+  await loader.init();
+
+  let slideOffset = 0;
+  for (let i = 0; i < inputPaths.length; i++) {
+    const inputPath = inputPaths[i];
+    if (inputPaths.length > 1) {
+      console.log(`\n📄 Processing ${i + 1}/${inputPaths.length}: ${inputPath}`);
+    }
+
+    const { slidesMap } = await processSingleInput(
+      loader,
+      inputPath,
+      options,
+      platformFontContext,
+      usedFontsMap
+    );
+    slideOffset = mergeSlidesMaps(mergedSlidesMap, slidesMap, slideOffset);
+  }
+
+  const usedFontsDeduped = [...new Set(Array.from(usedFontsMap.values()).map((d) => d.fontFamily))].sort();
+
+  const generator = new PPTXGenerator({
+    platformFontContext,
+    splitByHeight: options.splitByHeight,
+    slideSelector: options.slideSelector,
+  });
+  const data = await generator.generate(mergedSlidesMap);
+  const slideCount = generator.getSlideCount();
+
+  reportUsedFonts(usedFontsDeduped);
+
+  return {
+    data,
+    usedFonts: usedFontsDeduped,
+    slideCount,
+  };
 }
 
 export default convertHtmlToPptx;

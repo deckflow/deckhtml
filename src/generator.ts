@@ -18,11 +18,17 @@ import { getPlaceholderForMediaType } from './utils/placeholder-assets';
 export interface PPTXGeneratorOptions {
   fontResolver?: (d: UsedFontDescriptor) => string;
   platformFontContext?: PlatformFontContext;
+  /** When true, slide N starts at N × viewport height (long HTML split). */
+  splitByHeight?: boolean;
+  /** CSS selector grouping multiple slides in one HTML file. */
+  slideSelector?: string;
 }
 
 export class PPTXGenerator {
   private pptx: InstanceType<typeof PptxGenJS>;
   private converter: ElementConverter;
+  private splitByHeight: boolean;
+  private slideSelector?: string;
   private registry: StyleEnhancementRegistry;
 
   constructor(options: PPTXGeneratorOptions = {}) {
@@ -42,6 +48,8 @@ export class PPTXGenerator {
       height: SLIDE_HEIGHT_INCH,
     });
     this.pptx.layout = 'HTML_LAYOUT';
+    this.splitByHeight = options.splitByHeight ?? false;
+    this.slideSelector = options.slideSelector;
   }
 
   /**
@@ -131,8 +139,10 @@ export class PPTXGenerator {
   ): Promise<void> {
     const slide = this.pptx.addSlide();
 
-    // Calculate slide start Y position
-    const slideStartY = slideIndex * getSlideHeightPx();
+    // Origin Y for this slide's elements. For a single long HTML split by height or
+    // slide selector, use the topmost element; for merged multi-file inputs each file
+    // starts at y≈0 so slideIndex*height would wrongly offset later slides off-canvas.
+    const slideStartY = this.resolveSlideStartY(elements, slideIndex);
 
     // Keep inspector traversal order (DOM paint order approximation).
     // Global z-index sorting breaks stacking-context semantics, e.g. a parent
@@ -504,6 +514,28 @@ export class PPTXGenerator {
       default:
         console.warn(`Unknown element type: ${converted.type}`);
     }
+  }
+
+  /**
+   * Top Y origin for converting element coordinates on this slide.
+   */
+  private resolveSlideStartY(elements: ElementInfo[], slideIndex: number): number {
+    if (this.splitByHeight) {
+      return slideIndex * getSlideHeightPx();
+    }
+    if (this.slideSelector) {
+      if (elements.length === 0) {
+        return slideIndex * getSlideHeightPx();
+      }
+      let minY = Infinity;
+      for (const el of elements) {
+        if (el.y < minY) minY = el.y;
+      }
+      // Clamp so off-canvas decorations (negative y) on slide 0 do not shift layout down.
+      return Number.isFinite(minY) ? Math.max(0, minY) : 0;
+    }
+    // Single viewport per slide (default multi-file merge): always origin at top.
+    return 0;
   }
 
   /**

@@ -90,13 +90,14 @@ async function runLocalConvert(
   }
 
   if (inputPaths.length > 1) {
-    throw new Error(
-      'Multiple input files are only supported in cloud mode. Use --mode cloud.'
+    logVerbose(
+      ctx.verbose,
+      ctx.quiet,
+      `Merging ${inputPaths.length} HTML files into one PPTX`
     );
+  } else {
+    logVerbose(ctx.verbose, ctx.quiet, `Rendering ${inputPaths[0]}`);
   }
-
-  const input = inputPaths[0]!;
-  logVerbose(ctx.verbose, ctx.quiet, `Rendering ${input}`);
   logVerbose(
     ctx.verbose,
     ctx.quiet,
@@ -104,7 +105,7 @@ async function runLocalConvert(
   );
 
   const result = await convertHtmlToPptx({
-    input,
+    inputs: inputPaths,
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     allowLocalResources: true,
