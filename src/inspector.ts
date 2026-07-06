@@ -685,6 +685,10 @@ export class ElementInspector {
             if (!clone.getAttribute('xmlns')) {
               clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
             }
+            // Clone loses page CSS — bake currentColor / var() / inherited stroke into attributes.
+            const computedColor = window.getComputedStyle(svgEl).color;
+            const fallbackColorHex = cssColorToHex(computedColor) || '000000';
+            applyStylesToSvgClone(clone, svgEl, fallbackColorHex);
             const svgString = new XMLSerializer().serializeToString(clone);
             const encoded = btoa(unescape(encodeURIComponent(svgString)));
             const isStandaloneRoot = inputIsSvg && svgEl === getStandaloneSvgRoot();
