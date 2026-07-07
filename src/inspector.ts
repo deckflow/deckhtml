@@ -41,8 +41,6 @@ const SLIDE_ISOLATION_ANIMATION_SETTLE_MS = 3000;
 /** Qualified slide host height must be within [min, max] × viewport slide height. */
 const SLIDE_HEIGHT_MIN_RATIO = 0.5;
 const SLIDE_HEIGHT_MAX_RATIO = 2.0;
-/** Qualified slide host width must be at least this fraction of viewport slide width. */
-const SLIDE_WIDTH_MIN_RATIO = 0.8;
 const SLIDE_MIN_MATCHES = 2;
 
 /**
@@ -308,7 +306,6 @@ export class ElementInspector {
    */
   private async discoverByProbeRules(): Promise<SlideContainerDiscovery> {
     const slideHeight = getSlideHeightPx();
-    const slideWidth = getSlideWidthPx();
 
     for (const rule of SLIDE_PROBE_RULES) {
       const candidateCount = await this.page.evaluate(
@@ -336,8 +333,7 @@ export class ElementInspector {
 
       const discovery = await this.finalizeSlidesFromProbeParents(
         rule.label,
-        slideHeight,
-        slideWidth
+        slideHeight
       );
 
       if (discovery.count >= SLIDE_MIN_MATCHES) {
@@ -352,20 +348,18 @@ export class ElementInspector {
 
   /**
    * Probe matches locate slide parent(s); qualify every direct child whose height
-   * is within [50%, 200%] × slide height and width is at least 80% × slide width
-   * (includes siblings not matched by probe, e.g. header.hero next to section).
+   * is within [50%, 200%] × slide height (includes siblings not matched by probe,
+   * e.g. header.hero next to section).
    */
   private async finalizeSlidesFromProbeParents(
     ruleLabel: string,
-    slideHeight: number,
-    slideWidth: number
+    slideHeight: number
   ): Promise<SlideContainerDiscovery> {
     const minH = slideHeight * SLIDE_HEIGHT_MIN_RATIO;
     const maxH = slideHeight * SLIDE_HEIGHT_MAX_RATIO;
-    const minW = slideWidth * SLIDE_WIDTH_MIN_RATIO;
 
     return this.page.evaluate(
-      ({ candidateAttr, indexAttr, ruleLabel, minH, maxH, minW }) => {
+      ({ candidateAttr, indexAttr, ruleLabel, minH, maxH }) => {
         const candidates = Array.from(
           document.querySelectorAll(`[${candidateAttr}]`)
         );
@@ -387,10 +381,8 @@ export class ElementInspector {
         const qualified: Element[] = [];
         for (const parent of parents) {
           for (const child of Array.from(parent.children)) {
-            const rect = child.getBoundingClientRect();
-            if (rect.height >= minH && rect.height <= maxH && rect.width >= minW) {
-              qualified.push(child);
-            }
+            const h = child.getBoundingClientRect().height;
+            if (h >= minH && h <= maxH) qualified.push(child);
           }
         }
 
@@ -416,7 +408,6 @@ export class ElementInspector {
         ruleLabel,
         minH,
         maxH,
-        minW,
       }
     );
   }
