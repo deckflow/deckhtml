@@ -151,11 +151,12 @@ function applyRunFontSlots(
   const ooxmlLang = scriptToOoxmlLang(script);
   let updated = upsertLangAttr(rPrXml, ooxmlLang);
 
+  const stackSource = meta?.fontFamilySpecified ?? meta?.fontFamily;
   const faces =
-    meta?.fontFamily && platformCtx
-      ? parseScriptFontFaces(meta.fontFamily, {
+    stackSource && platformCtx
+      ? parseScriptFontFaces(meta?.fontFamily, {
           platformFontContext: platformCtx,
-          specifiedFontFamily: meta.fontFamilySpecified,
+          specifiedFontFamily: stackSource,
           textScript: script,
         })
       : fallbackFaces;
@@ -163,9 +164,25 @@ function applyRunFontSlots(
   if (!faces) return updated;
 
   updated = upsertScriptTypeface(updated, 'latin', faces.latin);
-  updated = upsertScriptTypeface(updated, 'ea', faces.ea);
-  updated = upsertScriptTypeface(updated, 'cs', faces.cs);
+
+  if (script === 'ar' || script === 'he') {
+    updated = upsertScriptTypeface(updated, 'cs', faces.cs ?? faces.latin);
+    updated = removeScriptTypeface(updated, 'ea');
+  } else if (script === 'sc' || script === 'tc' || script === 'jp' || script === 'kr') {
+    updated = upsertScriptTypeface(updated, 'ea', faces.ea);
+    updated = removeScriptTypeface(updated, 'cs');
+  } else {
+    updated = removeScriptTypeface(updated, 'ea');
+    updated = removeScriptTypeface(updated, 'cs');
+  }
+
   return updated;
+}
+
+function removeScriptTypeface(rPrXml: string, tag: 'latin' | 'ea' | 'cs'): string {
+  const selfClosing = new RegExp(`<a:${tag}\\b[^>]*/>`, 'g');
+  const withBody = new RegExp(`<a:${tag}\\b[^>]*>[\\s\\S]*?</a:${tag}>`, 'g');
+  return rPrXml.replace(selfClosing, '').replace(withBody, '');
 }
 
 function upsertLangAttr(rPrXml: string, lang: string): string {

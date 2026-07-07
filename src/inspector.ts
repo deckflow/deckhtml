@@ -2296,12 +2296,9 @@ export class ElementInspector {
 
         /**
          * Read cascaded specified font-family (may still contain sans-serif/serif generics).
+         * Walks ancestors for inherited stylesheet rules; falls back to computed font-family.
          */
-        function getSpecifiedFontFamily(element: Element): string | undefined {
-          const htmlEl = element as HTMLElement;
-          const inline = htmlEl.style?.fontFamily;
-          if (inline) return inline;
-
+        function getStylesheetFontFamily(el: Element): string | undefined {
           const matches: { ff: string; order: number }[] = [];
           let order = 0;
           try {
@@ -2316,7 +2313,7 @@ export class ElementInspector {
                 const rule = rules[i];
                 if (rule instanceof CSSStyleRule) {
                   try {
-                    if (element.matches(rule.selectorText)) {
+                    if (el.matches(rule.selectorText)) {
                       const ff = rule.style.getPropertyValue('font-family');
                       if (ff) matches.push({ ff, order: order++ });
                     }
@@ -2329,7 +2326,28 @@ export class ElementInspector {
           } catch {
             /* ignore */
           }
-          if (matches.length) return matches[matches.length - 1].ff;
+          return matches.length ? matches[matches.length - 1]!.ff : undefined;
+        }
+
+        function getSpecifiedFontFamily(element: Element): string | undefined {
+          let el: Element | null = element;
+          while (el) {
+            const htmlEl = el as HTMLElement;
+            const inline = htmlEl.style?.fontFamily;
+            if (inline) return inline;
+
+            const fromSheet = getStylesheetFontFamily(el);
+            if (fromSheet) return fromSheet;
+
+            el = el.parentElement;
+          }
+
+          try {
+            const computed = window.getComputedStyle(element).fontFamily;
+            if (computed) return computed;
+          } catch {
+            /* ignore */
+          }
           return undefined;
         }
 

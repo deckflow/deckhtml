@@ -289,14 +289,14 @@ export function parseFontFamily(
 export interface ScriptFontFaces {
   latin: string;
   ea: string;
-  cs: string;
+  cs?: string;
 }
 
 /**
  * Parse CSS font-family stack into PPTX script-specific faces.
  * - latin: first font in stack
  * - ea: first Chinese font in stack
- * - cs: Arial by default, or platform-mapped font for ar/he langs
+ * - cs: only for ar/he scripts (complex script)
  */
 export function parseScriptFontFaces(
   fontFamily: string | undefined,
@@ -311,7 +311,7 @@ export function parseScriptFontFaces(
 
   if (!fontFamily && !specified) {
     return applyPlatformScriptSlots(
-      { latin: defaultLatin, ea: defaultLatin, cs: defaultLatin },
+      buildScriptFontFaces(defaultLatin, defaultLatin, textScript, ctx),
       ctx,
       textScript,
       specified,
@@ -319,9 +319,10 @@ export function parseScriptFontFaces(
     );
   }
 
+  const stackSource = specified ?? fontFamily;
   const effectiveFamily = isPlatformFontContextActive(ctx)
-    ? resolveFontFamilyForPlatform(fontFamily, specified, ctx, textScript)
-    : fontFamily;
+    ? resolveFontFamilyForPlatform(fontFamily, stackSource, ctx, textScript)
+    : stackSource;
 
   const tokens = splitFontStack(effectiveFamily ?? '')
     .map((x) => x.trim().replace(/['"]/g, ''))
@@ -329,7 +330,7 @@ export function parseScriptFontFaces(
 
   if (tokens.length === 0) {
     return applyPlatformScriptSlots(
-      { latin: defaultLatin, ea: defaultLatin, cs: defaultLatin },
+      buildScriptFontFaces(defaultLatin, defaultLatin, textScript, ctx),
       ctx,
       textScript,
       specified,
@@ -341,7 +342,32 @@ export function parseScriptFontFaces(
   const eaToken = tokens.find((token) => isChineseFont(token));
   const ea = eaToken ? parseFontFamily(eaToken, ctx, textScript) : latin;
 
-  return applyPlatformScriptSlots({ latin, ea, cs: 'Arial' }, ctx, textScript, specified, fontFamily);
+  return applyPlatformScriptSlots(
+    buildScriptFontFaces(latin, ea, textScript, ctx),
+    ctx,
+    textScript,
+    specified,
+    fontFamily
+  );
+}
+
+function buildScriptFontFaces(
+  latin: string,
+  ea: string,
+  textScript: PlatformFontLang,
+  ctx?: PlatformFontContext
+): ScriptFontFaces {
+  if (textScript === 'ar' || textScript === 'he') {
+    const cs = isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFont('sans', ctx, textScript)
+      : 'Arial';
+    return { latin, ea, cs };
+  }
+  return { latin, ea };
+}
+
+function stackHasAnyNamedFont(...stacks: (string | undefined)[]): boolean {
+  return stacks.some((stack) => stackHasNamedFontLocal(stack));
 }
 
 function applyPlatformScriptSlots(
@@ -351,30 +377,31 @@ function applyPlatformScriptSlots(
   specified?: string,
   computed?: string
 ): ScriptFontFaces {
-  if (!isPlatformFontContextActive(ctx)) return faces;
+  if (!isPlatformFontContextActive(ctx)) {
+    if (textScript === 'ar' || textScript === 'he') {
+      return { ...faces, cs: faces.cs ?? faces.latin };
+    }
+    return faces;
+  }
+
+  if (stackHasAnyNamedFont(specified, computed)) {
+    if (textScript === 'ar' || textScript === 'he') {
+      const genericKind =
+        detectStackGenericKind(specified) ?? detectStackGenericKind(computed) ?? 'sans';
+      return { ...faces, cs: getPlatformMappedFont(genericKind, ctx, textScript) };
+    }
+    return faces;
+  }
 
   const genericKind = detectStackGenericKind(specified) ?? detectStackGenericKind(computed);
   if (!genericKind) return faces;
 
   const mapped = getPlatformMappedFont(genericKind, ctx, textScript);
 
-  if (textScript === 'latin') {
-    if (!specified || !stackHasNamedFontLocal(specified)) {
-      return { latin: mapped, ea: mapped, cs: getPlatformMappedFont('sans', ctx, 'latin') };
-    }
-  } else if (textScript === 'sc' || textScript === 'tc' || textScript === 'jp' || textScript === 'kr') {
-    if (!specified || !stackHasNamedFontLocal(specified)) {
-      return { latin: mapped, ea: mapped, cs: getPlatformMappedFont('sans', ctx, textScript) };
-    }
-    return { ...faces, ea: faces.ea === faces.latin ? mapped : faces.ea };
-  } else if (textScript === 'ar' || textScript === 'he') {
-    if (!specified || !stackHasNamedFontLocal(specified)) {
-      return { latin: mapped, ea: mapped, cs: mapped };
-    }
-    return { ...faces, cs: mapped };
+  if (textScript === 'ar' || textScript === 'he') {
+    return { latin: mapped, ea: mapped, cs: mapped };
   }
-
-  return faces;
+  return { latin: mapped, ea: mapped };
 }
 
 function stackHasNamedFontLocal(fontFamily: string | undefined): boolean {

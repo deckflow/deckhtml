@@ -97,6 +97,16 @@ function isNeutral(cp: number): boolean {
   return cat;
 }
 
+function isCjkPunctuation(cp: number): boolean {
+  if (cp >= 0x3000 && cp <= 0x303f) return true;
+  if (cp >= 0xfe30 && cp <= 0xfe4f) return true;
+  if (cp >= 0xff01 && cp <= 0xff0f) return true;
+  if (cp >= 0xff1a && cp <= 0xff20) return true;
+  if (cp >= 0xff3b && cp <= 0xff40) return true;
+  if (cp >= 0xff5b && cp <= 0xff65) return true;
+  return false;
+}
+
 function classifyHan(hints: ContainerScriptHints): PlatformFontLang {
   if (hints.hasKana) return 'jp';
   if (hints.hasHangul) return 'kr';
@@ -109,9 +119,24 @@ export function classifyChar(cp: number, hints: ContainerScriptHints): PlatformF
   if (isKana(cp)) return 'jp';
   if (isArabic(cp)) return 'ar';
   if (isHebrew(cp)) return 'he';
-  if (isCjkHan(cp)) return classifyHan(hints);
+  if (isCjkHan(cp) || isCjkPunctuation(cp)) return classifyHan(hints);
   if (isLatinLike(cp) || isNeutral(cp)) return 'latin';
   return 'latin';
+}
+
+function mergeAdjacentSegments(segments: TextScriptSegment[]): TextScriptSegment[] {
+  if (segments.length <= 1) return segments;
+  const merged: TextScriptSegment[] = [{ ...segments[0]! }];
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i]!;
+    const last = merged[merged.length - 1]!;
+    if (last.script === seg.script) {
+      last.text += seg.text;
+    } else {
+      merged.push({ ...seg });
+    }
+  }
+  return merged;
 }
 
 /**
@@ -161,5 +186,6 @@ export function splitTextByScript(
   }
   flush();
 
-  return segments.length > 0 ? segments : [{ text, script: 'latin' }];
+  const result = segments.length > 0 ? segments : [{ text, script: 'latin' as PlatformFontLang }];
+  return mergeAdjacentSegments(result);
 }

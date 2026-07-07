@@ -139,7 +139,7 @@ function collectFontsFromElements(
       if (faces.ea !== faces.latin) {
         registerFont(faces.ea, styles);
       }
-      if (faces.cs !== faces.latin && faces.cs !== faces.ea) {
+      if (faces.cs && faces.cs !== faces.latin && faces.cs !== faces.ea) {
         registerFont(faces.cs, styles);
       }
     }
