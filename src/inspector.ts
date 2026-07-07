@@ -2351,19 +2351,6 @@ export class ElementInspector {
           return undefined;
         }
 
-        /** CSS opacity is not inherited; multiply ancestor opacities for painted result. */
-        function multiplyAncestorOpacity(element: Element, opacity: number): number {
-          let effective = opacity;
-          for (
-            let parent = element.parentElement;
-            parent && parent !== document.body;
-            parent = parent.parentElement
-          ) {
-            effective *= parseFloat(window.getComputedStyle(parent).opacity) || 1;
-          }
-          return effective;
-        }
-
         /**
          * Get computed styles for an element
          */
@@ -2521,10 +2508,6 @@ export class ElementInspector {
               if (rx > 0 || ry > 0) base.borderRadius = `${Math.max(rx, ry)}px`;
             }
           }
-
-          // Decomposed SVG children (circle, path, …) inherit visual opacity from ancestors
-          // (e.g. <svg class="opacity-5">) even though computed style.opacity stays 1.
-          base.opacity = multiplyAncestorOpacity(element, base.opacity ?? 1);
 
           return base;
         }
