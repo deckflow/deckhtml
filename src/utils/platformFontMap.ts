@@ -1,75 +1,102 @@
 /**
  * Platform / language generic font mapping for PPTX conversion.
- * Maps sans-serif, serif, and system UI generics to OS-specific fonts.
+ * Maps CSS generic font-family keywords to OS-specific fonts.
+ *
+ * Data: platformFontMap.data.ts (synced from @deckflow/html2pptx)
  */
 import { splitFontStack } from './chineseFonts';
+import { GENERIC_FONT_OS_MAP, PlatformFontMappingEntry } from './platformFontMap.data';
 
-export type PlatformTarget = 'win' | 'mac';
+/** PPTX target platforms with full mapping tables. */
+export type PlatformTarget = 'win' | 'mac' | 'ios' | 'android' | 'linux';
+
+/** Active conversion targets (CLI/API). ios/android/linux tables exist for reference & future use. */
+export type ActivePlatformTarget = 'win' | 'mac';
+
 export type PlatformFontLang = 'sc' | 'tc' | 'jp' | 'kr' | 'ar' | 'he' | 'latin';
 
+/** CSS generic font-family keywords (each may map to a different OS font). */
+export type GenericFontName =
+  | 'serif'
+  | 'sans-serif'
+  | 'monospace'
+  | 'cursive'
+  | 'fantasy'
+  | 'system-ui'
+  | 'ui-serif'
+  | 'ui-sans-serif'
+  | 'ui-monospace'
+  | 'math';
+
+/** Collapsed family category for script-slot logic (sans vs serif vs mono, etc.). */
+export type GenericFontKind = 'serif' | 'sans' | 'monospace' | 'cursive' | 'fantasy' | 'math';
+
 export interface PlatformFontContext {
-  platform: PlatformTarget;
+  platform: ActivePlatformTarget;
   lang: PlatformFontLang;
 }
 
-interface PlatformFontRow {
-  sansWin: string;
-  sansMac: string;
-  serifWin: string;
-  serifMac: string;
-}
-
-const PLATFORM_LANG_FONT_MAP: Record<PlatformFontLang, PlatformFontRow> = {
-  latin: {
-    sansWin: 'Arial',
-    sansMac: 'San Francisco',
-    serifWin: 'Times New Roman',
-    serifMac: 'Times New Roman',
-  },
-  sc: {
-    sansWin: 'Microsoft YaHei',
-    sansMac: 'PingFang SC',
-    serifWin: 'SimSun',
-    serifMac: 'Songti SC',
-  },
-  tc: {
-    sansWin: 'Microsoft JhengHei',
-    sansMac: 'PingFang TC',
-    serifWin: 'PMingLiU',
-    serifMac: 'Songti TC',
-  },
-  jp: {
-    sansWin: 'MS PGothic',
-    sansMac: 'YuGothic',
-    serifWin: 'MS PMincho',
-    serifMac: 'YuMincho',
-  },
-  kr: {
-    sansWin: 'Malgun Gothic',
-    sansMac: 'Apple SD Gothic Neo',
-    serifWin: 'Batang',
-    serifMac: 'AppleMyungjo',
-  },
-  ar: {
-    sansWin: 'Segoe UI Arabic',
-    sansMac: 'Geeza Pro',
-    serifWin: 'Traditional Arabic',
-    serifMac: 'Baghdad',
-  },
-  he: {
-    sansWin: 'Segoe UI',
-    sansMac: 'Arial',
-    serifWin: 'David',
-    serifMac: 'Corsiva Hebrew',
-  },
+/** CSS token (incl. vendor aliases) → CSV generic_name key. */
+const TOKEN_TO_GENERIC_NAME: Record<string, GenericFontName> = {
+  serif: 'serif',
+  'ui-serif': 'ui-serif',
+  'sans-serif': 'sans-serif',
+  'system-ui': 'system-ui',
+  'ui-sans-serif': 'ui-sans-serif',
+  '-apple-system': 'system-ui',
+  blinkmacsystemfont: 'system-ui',
+  monospace: 'monospace',
+  'ui-monospace': 'ui-monospace',
+  cursive: 'cursive',
+  fantasy: 'fantasy',
+  math: 'math',
 };
 
-const GENERIC_SANS =
-  /^(sans-serif|system-ui|ui-sans-serif|-apple-system|blinkmacsystemfont)$/i;
-const GENERIC_SERIF = /^(serif|ui-serif)$/i;
+/** generic_name → collapsed kind for applyPlatformScriptSlots. */
+const GENERIC_NAME_TO_KIND: Record<GenericFontName, GenericFontKind> = {
+  serif: 'serif',
+  'ui-serif': 'serif',
+  'sans-serif': 'sans',
+  'system-ui': 'sans',
+  'ui-sans-serif': 'sans',
+  monospace: 'monospace',
+  'ui-monospace': 'monospace',
+  cursive: 'cursive',
+  fantasy: 'fantasy',
+  math: 'math',
+};
+
+/** Default generic_name when resolving by collapsed kind only. */
+const KIND_CANONICAL_NAME: Record<GenericFontKind, GenericFontName> = {
+  serif: 'serif',
+  sans: 'sans-serif',
+  monospace: 'monospace',
+  cursive: 'cursive',
+  fantasy: 'fantasy',
+  math: 'math',
+};
+
+const ALL_GENERIC_TOKENS = new Set(Object.keys(TOKEN_TO_GENERIC_NAME));
 
 function unquoteToken(token: string): string {
   return token.trim().replace(/^['"]|['"]$/g, '');
+}
+
+function tokenCore(token: string): string {
+  return unquoteToken(token).toLowerCase();
+}
+
+export function genericNameFromToken(token: string): GenericFontName | undefined {
+  return TOKEN_TO_GENERIC_NAME[tokenCore(token)];
+}
+
+export function genericKindFromToken(token: string): GenericFontKind | undefined {
+  const name = genericNameFromToken(token);
+  return name ? GENERIC_NAME_TO_KIND[name] : undefined;
+}
+
+export function isGenericFontToken(token: string): boolean {
+  return ALL_GENERIC_TOKENS.has(tokenCore(token));
 }
 
 export function isPlatformFontContextActive(
@@ -78,34 +105,77 @@ export function isPlatformFontContextActive(
   return ctx?.platform != null && ctx?.lang != null;
 }
 
+export function getPlatformFontMappingByName(
+  genericName: GenericFontName,
+  ctx: PlatformFontContext
+): PlatformFontMappingEntry {
+  return GENERIC_FONT_OS_MAP[ctx.platform][ctx.lang][genericName];
+}
+
+export function getPlatformFontMapping(
+  kind: GenericFontKind,
+  ctx: PlatformFontContext
+): PlatformFontMappingEntry {
+  return getPlatformFontMappingByName(KIND_CANONICAL_NAME[kind], ctx);
+}
+
+/** Primary PPTX font for a CSS generic token on the target platform/locale. */
+export function getPlatformMappedFontByToken(
+  token: string,
+  ctx: PlatformFontContext
+): string | undefined {
+  const name = genericNameFromToken(token);
+  if (!name) return undefined;
+  return getPlatformFontMappingByName(name, ctx).primary;
+}
+
+/** Primary PPTX font for a collapsed kind (uses canonical generic_name). */
 export function getPlatformMappedFont(
-  generic: 'sans' | 'serif',
+  kind: GenericFontKind,
   ctx: PlatformFontContext
 ): string {
-  const row = PLATFORM_LANG_FONT_MAP[ctx.lang];
-  if (generic === 'serif') {
-    return ctx.platform === 'win' ? row.serifWin : row.serifMac;
-  }
-  return ctx.platform === 'win' ? row.sansWin : row.sansMac;
+  return getPlatformFontMapping(kind, ctx).primary;
+}
+
+/** Primary + fallback stack as a CSS-like comma-separated list. */
+export function getPlatformMappedFontStack(
+  kind: GenericFontKind,
+  ctx: PlatformFontContext
+): string {
+  const { primary, fallbacks } = getPlatformFontMapping(kind, ctx);
+  return [primary, ...fallbacks].join(', ');
 }
 
 export function isGenericSansToken(token: string): boolean {
-  return GENERIC_SANS.test(unquoteToken(token).toLowerCase());
+  return genericKindFromToken(token) === 'sans';
 }
 
 export function isGenericSerifToken(token: string): boolean {
-  return GENERIC_SERIF.test(unquoteToken(token).toLowerCase());
+  return genericKindFromToken(token) === 'serif';
 }
 
 /** Last generic kind in stack wins (CSS fallback order). */
 export function detectStackGenericKind(
   fontFamily: string | undefined
-): 'sans' | 'serif' | undefined {
+): GenericFontKind | undefined {
   if (!fontFamily) return undefined;
-  let last: 'sans' | 'serif' | undefined;
+  let last: GenericFontKind | undefined;
   for (const tok of splitFontStack(fontFamily)) {
-    if (isGenericSansToken(tok)) last = 'sans';
-    else if (isGenericSerifToken(tok)) last = 'serif';
+    const kind = genericKindFromToken(tok);
+    if (kind) last = kind;
+  }
+  return last;
+}
+
+/** Last generic token name in stack wins (preserves sans-serif vs system-ui distinction). */
+export function detectStackGenericName(
+  fontFamily: string | undefined
+): GenericFontName | undefined {
+  if (!fontFamily) return undefined;
+  let last: GenericFontName | undefined;
+  for (const tok of splitFontStack(fontFamily)) {
+    const name = genericNameFromToken(tok);
+    if (name) last = name;
   }
   return last;
 }
@@ -113,8 +183,8 @@ export function detectStackGenericKind(
 export function stackHasNamedFont(fontFamily: string | undefined): boolean {
   if (!fontFamily) return false;
   return splitFontStack(fontFamily).some((tok) => {
-    const core = unquoteToken(tok).toLowerCase();
-    return core && !GENERIC_SANS.test(core) && !GENERIC_SERIF.test(core);
+    const core = tokenCore(tok);
+    return core && !ALL_GENERIC_TOKENS.has(core);
   });
 }
 
@@ -127,13 +197,10 @@ export function replaceGenericFontTokensInStack(
 
   let changed = false;
   const replaced = tokens.map((tok) => {
-    if (isGenericSansToken(tok)) {
+    const mapped = getPlatformMappedFontByToken(tok, ctx);
+    if (mapped) {
       changed = true;
-      return getPlatformMappedFont('sans', ctx);
-    }
-    if (isGenericSerifToken(tok)) {
-      changed = true;
-      return getPlatformMappedFont('serif', ctx);
+      return mapped;
     }
     return tok;
   });
@@ -149,25 +216,31 @@ export function resolveFontFamilyForPlatform(
   specifiedFamily: string | undefined,
   ctx: PlatformFontContext
 ): string {
-  const specifiedGeneric = detectStackGenericKind(specifiedFamily);
-  const computedGeneric = detectStackGenericKind(computedFamily);
+  const specifiedName = detectStackGenericName(specifiedFamily);
+  const computedName = detectStackGenericName(computedFamily);
+  const specifiedKind = specifiedName ? GENERIC_NAME_TO_KIND[specifiedName] : undefined;
+  const computedKind = computedName ? GENERIC_NAME_TO_KIND[computedName] : undefined;
 
-  if (specifiedGeneric && specifiedFamily && !stackHasNamedFont(specifiedFamily)) {
-    return getPlatformMappedFont(specifiedGeneric, ctx);
+  if (specifiedName && specifiedFamily && !stackHasNamedFont(specifiedFamily)) {
+    return getPlatformFontMappingByName(specifiedName, ctx).primary;
   }
 
   const base = computedFamily ?? specifiedFamily ?? '';
   if (!base) {
-    return getPlatformMappedFont(specifiedGeneric ?? computedGeneric ?? 'sans', ctx);
+    const fallbackName =
+      specifiedName ??
+      computedName ??
+      KIND_CANONICAL_NAME[specifiedKind ?? computedKind ?? 'sans'];
+    return getPlatformFontMappingByName(fallbackName, ctx).primary;
   }
 
   let resolved = replaceGenericFontTokensInStack(base, ctx);
 
   if (
-    specifiedGeneric &&
+    specifiedName &&
     specifiedFamily &&
     stackHasNamedFont(specifiedFamily) &&
-    !computedGeneric
+    !computedName
   ) {
     resolved = replaceGenericFontTokensInStack(specifiedFamily, ctx);
   }
@@ -176,7 +249,7 @@ export function resolveFontFamilyForPlatform(
 }
 
 export function buildPlatformFontContext(options: {
-  platform?: PlatformTarget;
+  platform?: ActivePlatformTarget;
   lang?: PlatformFontLang;
 }): PlatformFontContext | undefined {
   if (options.platform && options.lang) {
@@ -184,3 +257,5 @@ export function buildPlatformFontContext(options: {
   }
   return undefined;
 }
+
+export { GENERIC_FONT_OS_MAP, type PlatformFontMappingEntry };

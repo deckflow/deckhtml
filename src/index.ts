@@ -14,7 +14,22 @@ export {
 } from './utils/chineseFonts';
 export {
   buildPlatformFontContext,
+  type ActivePlatformTarget,
+  type GenericFontKind,
+  type GenericFontName,
   type PlatformFontContext,
   type PlatformFontLang,
+  type PlatformFontMappingEntry,
   type PlatformTarget,
+  GENERIC_FONT_OS_MAP,
+  detectStackGenericKind,
+  detectStackGenericName,
+  genericKindFromToken,
+  genericNameFromToken,
+  getPlatformFontMapping,
+  getPlatformFontMappingByName,
+  getPlatformMappedFont,
+  getPlatformMappedFontByToken,
+  getPlatformMappedFontStack,
+  isGenericFontToken,
 } from './utils/platformFontMap';

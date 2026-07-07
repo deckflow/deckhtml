@@ -8,8 +8,8 @@ import { isChineseFont, splitFontStack } from './chineseFonts';
 import {
   detectStackGenericKind,
   getPlatformMappedFont,
-  isGenericSansToken,
-  isGenericSerifToken,
+  getPlatformMappedFontByToken,
+  isGenericFontToken,
   isPlatformFontContextActive,
   PlatformFontContext,
   resolveFontFamilyForPlatform,
@@ -239,8 +239,8 @@ export function parseFontFamily(
   const lower = firstFont.toLowerCase();
 
   if (isPlatformFontContextActive(ctx)) {
-    if (isGenericSansToken(firstFont)) return getPlatformMappedFont('sans', ctx);
-    if (isGenericSerifToken(firstFont)) return getPlatformMappedFont('serif', ctx);
+    const mapped = getPlatformMappedFontByToken(firstFont, ctx);
+    if (mapped) return mapped;
   }
 
   const fontMap: Record<string, string> = {
@@ -250,8 +250,33 @@ export function parseFontFamily(
     serif: isPlatformFontContextActive(ctx)
       ? getPlatformMappedFont('serif', ctx)
       : 'Times New Roman',
-    monospace: 'Courier New',
-    cursive: 'Comic Sans MS',
+    monospace: isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFont('monospace', ctx)
+      : 'Courier New',
+    cursive: isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFont('cursive', ctx)
+      : 'Comic Sans MS',
+    fantasy: isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFont('fantasy', ctx)
+      : 'Impact',
+    math: isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFont('math', ctx)
+      : 'Cambria Math',
+    'system-ui': isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFontByToken('system-ui', ctx) ?? getPlatformMappedFont('sans', ctx)
+      : 'Arial',
+    'ui-sans-serif': isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFontByToken('ui-sans-serif', ctx) ?? getPlatformMappedFont('sans', ctx)
+      : 'Arial',
+    'ui-serif': isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFontByToken('ui-serif', ctx) ?? getPlatformMappedFont('serif', ctx)
+      : 'Times New Roman',
+    'ui-monospace': isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFontByToken('ui-monospace', ctx) ?? getPlatformMappedFont('monospace', ctx)
+      : 'Courier New',
+    '-apple-system': isPlatformFontContextActive(ctx)
+      ? getPlatformMappedFontByToken('-apple-system', ctx) ?? getPlatformMappedFont('sans', ctx)
+      : 'Arial',
   };
 
   return fontMap[lower] || firstFont;
@@ -339,7 +364,7 @@ function stackHasNamedFontLocal(fontFamily: string | undefined): boolean {
   if (!fontFamily) return false;
   return splitFontStack(fontFamily).some((tok) => {
     const core = tok.trim().replace(/^['"]|['"]$/g, '').toLowerCase();
-    return core && !isGenericSansToken(tok) && !isGenericSerifToken(tok);
+    return core && !isGenericFontToken(tok);
   });
 }
 
