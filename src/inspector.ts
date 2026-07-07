@@ -687,6 +687,19 @@ export class ElementInspector {
           return el.namespaceURI === 'http://www.w3.org/2000/svg';
         }
 
+        /** CSS opacity is not inherited; multiply ancestor opacities for painted result. */
+        function getEffectiveOpacity(element: Element): number {
+          let effective = parseFloat(window.getComputedStyle(element).opacity) || 1;
+          for (
+            let parent = element.parentElement;
+            parent && parent !== document.body;
+            parent = parent.parentElement
+          ) {
+            effective *= parseFloat(window.getComputedStyle(parent).opacity) || 1;
+          }
+          return effective;
+        }
+
         /** Serialize SVG as inline SVG image (data URL). */
         function emitSvgAsImage(svgEl: SVGElement, rect: DOMRect): void {
           try {
@@ -698,9 +711,18 @@ export class ElementInspector {
             const computedColor = window.getComputedStyle(svgEl).color;
             const fallbackColorHex = cssColorToHex(computedColor) || '000000';
             applyStylesToSvgClone(clone, svgEl, fallbackColorHex);
+            const effectiveOpacity = getEffectiveOpacity(svgEl);
+            if (effectiveOpacity < 1 - 1e-6) {
+              clone.setAttribute('opacity', String(effectiveOpacity));
+            } else {
+              clone.removeAttribute('opacity');
+            }
             const svgString = new XMLSerializer().serializeToString(clone);
             const encoded = btoa(unescape(encodeURIComponent(svgString)));
             const isStandaloneRoot = inputIsSvg && svgEl === getStandaloneSvgRoot();
+            const styles = getComputedStyles(svgEl);
+            // Opacity is baked into the serialized SVG — avoid double-fading in convertImageElement.
+            styles.opacity = 1;
             result.push({
               type: 'image',
               tag: 'svg',
@@ -708,7 +730,7 @@ export class ElementInspector {
               y: isStandaloneRoot ? 0 : rect.top,
               width: isStandaloneRoot ? window.innerWidth : rect.width,
               height: isStandaloneRoot ? window.innerHeight : rect.height,
-              styles: getComputedStyles(svgEl),
+              styles,
               src: `data:image/svg+xml;base64,${encoded}`,
             });
             markDomAsPptxMapped(svgEl);

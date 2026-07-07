@@ -1019,9 +1019,12 @@ export class ElementConverter {
       options.path = imageSrc;
     }
 
-    const transparency = parseTransparency(element.styles?.opacity);
-    if (transparency > 0) {
-      options.transparency = transparency;
+    // SVG from emitSvgAsImage bakes opacity into the data URL — do not apply twice.
+    if (element.tag !== 'svg') {
+      const transparency = parseTransparency(element.styles?.opacity);
+      if (transparency > 0) {
+        options.transparency = transparency;
+      }
     }
 
     // Handle object-fit CSS property (cover/contain)
