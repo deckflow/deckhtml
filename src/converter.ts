@@ -4,7 +4,7 @@
  */
 
 import PptxGenJSBase from 'pptxgenjs';
-import { ElementInfo, UsedFontDescriptor } from './types';
+import { ElementInfo, TextRun, UsedFontDescriptor } from './types';
 import {
   pxToInch,
   pxToInchX,
@@ -41,7 +41,12 @@ import {
   isItalic,
   isInlinePillBox,
 } from './utils/style';
-import { PlatformFontContext } from './utils/platformFontMap';
+import { PlatformFontContext, PlatformFontLang } from './utils/platformFontMap';
+import {
+  ContainerScriptHints,
+  detectContainerScriptHints,
+  splitTextByScript,
+} from './utils/textScript';
 import { StyleEnhancementRegistry } from './enhancer/registry';
 import { getMathPresentationMeta } from './utils/omml-style';
 import {
@@ -71,7 +76,8 @@ export class ElementConverter {
       fontFamilySpecified?: string;
       fontWeight?: string;
       fontStyle?: string;
-    }
+    },
+    textScript: PlatformFontLang = 'latin'
   ): ScriptFontFaces | undefined {
     if (!styles?.fontFamily) return undefined;
     const faFreeFace = normalizeFontAwesomeFreeFamily(
@@ -92,6 +98,7 @@ export class ElementConverter {
     const faces = parseScriptFontFaces(styles.fontFamily, {
       platformFontContext: this.platformFontContext,
       specifiedFontFamily: styles.fontFamilySpecified,
+      textScript,
     });
     if (!this.fontResolver) return faces;
 
@@ -111,6 +118,48 @@ export class ElementConverter {
             italic,
           });
     return { latin: latinResolved, ea: eaResolved, cs: faces.cs };
+  }
+
+  private getContainerText(element: ElementInfo): string {
+    if (element.richText?.length) {
+      return element.richText.map((run) => run.text).join('');
+    }
+    return element.content ?? '';
+  }
+
+  private splitTextRunByScript(run: TextRun, hints: ContainerScriptHints): TextRun[] {
+    const segments = splitTextByScript(run.text, hints);
+    if (segments.length <= 1) {
+      return [{ ...run, textScript: segments[0]?.script ?? 'latin' }];
+    }
+    return segments.map((seg, index) => ({
+      ...run,
+      text: seg.text,
+      textScript: seg.script,
+      softBreakBefore: run.softBreakBefore && index === 0,
+      breakLine: run.breakLine && index === segments.length - 1,
+    }));
+  }
+
+  private buildScriptSplitTextPieces(
+    text: string,
+    styles: ElementInfo['styles'],
+    baseOptions: Record<string, unknown>,
+    hints: ContainerScriptHints
+  ): Array<{ text: string; options: Record<string, unknown> }> | string {
+    const segments = splitTextByScript(text, hints);
+    if (segments.length <= 1) return text;
+
+    return segments.map((seg) => {
+      const pieceOptions = getTextOptions(styles, this.platformFontContext, seg.text);
+      const faces = this.resolveScriptFontFaces(styles, seg.script);
+      if (faces !== undefined) {
+        pieceOptions.fontFace = faces.latin;
+      } else if (baseOptions.fontFace) {
+        pieceOptions.fontFace = baseOptions.fontFace;
+      }
+      return { text: seg.text, options: pieceOptions };
+    });
   }
 
   /**
@@ -550,14 +599,20 @@ export class ElementConverter {
 
     // Check if this is rich text (multiple styled runs)
     let textContent: any;
+    const containerText = this.getContainerText(element);
+    const containerHints = detectContainerScriptHints(containerText);
+
     if (element.richText && element.richText.length > 0) {
       // Convert rich text runs to pptxgenjs format
       textContent = element.richText.flatMap((run: any, index: number) => {
-        const runOptions = getTextOptions(run.styles, this.platformFontContext);
+        const scriptRuns = this.splitTextRunByScript(run, containerHints);
+        return scriptRuns.flatMap((scriptRun) => {
+        const textScript = scriptRun.textScript ?? 'latin';
+        const runOptions = getTextOptions(run.styles, this.platformFontContext, scriptRun.text);
         // Line spacing is paragraph-level (host element.options); per-run values stack badly on <a:br/>.
         delete runOptions.lineSpacing;
         delete runOptions.lineSpacingMultiple;
-        const runScriptFaces = this.resolveScriptFontFaces(run.styles);
+        const runScriptFaces = this.resolveScriptFontFaces(run.styles, textScript);
         if (runScriptFaces !== undefined) {
           runOptions.fontFace = runScriptFaces.latin;
           if (!scriptFontFaces) scriptFontFaces = runScriptFaces;
@@ -565,7 +620,7 @@ export class ElementConverter {
         if (textGradientData && !runOptions.color && textGradientData.stops?.length) {
           runOptions.color = textGradientData.stops[0].color;
         }
-        let runText = sanitizeTextForXml(run.text);
+        let runText = sanitizeTextForXml(scriptRun.text);
         if (element.styles.textTransform === 'uppercase') {
           runText = runText.toUpperCase();
         }
@@ -593,12 +648,12 @@ export class ElementConverter {
         }
         // <br> is already softBreakBefore; leading \n in the same run (DOM whitespace after <br>) would
         // split to ['', '…'] and set softBreak on both pieces → duplicate <a:br/> in OOXML.
-        if (run.softBreakBefore) {
+        if (scriptRun.softBreakBefore) {
           runText = runText.replace(/^\r?\n+/, '');
         }
         // pptxgen treats "\n" in run text as new a:p; split to soft breaks (a:br) within one paragraph
         let segments = runText.split(/\r?\n/);
-        if (run.softBreakBefore) {
+        if (scriptRun.softBreakBefore) {
           while (segments.length > 1 && segments[0] === '') {
             segments.shift();
           }
@@ -607,7 +662,7 @@ export class ElementConverter {
         return segments.map((seg, si) => {
           const pieceOpts: any = { ...runOptions };
           // <a:br/> lines without an explicit run sz use PPT default (~18pt) for line-height → oversized gaps.
-          if (run.softBreakBefore && si === 0) {
+          if (scriptRun.softBreakBefore && si === 0) {
             pieceOpts.softBreakBefore = true;
             pieceOpts.fontSize = options.fontSize;
             pieceOpts.fontFace = pieceOpts.fontFace ?? options.fontFace;
@@ -619,13 +674,14 @@ export class ElementConverter {
           if (si > 0) {
             pieceOpts.softBreakBefore = true;
           }
-          if (run.breakLine && si === lastSi) {
+          if (scriptRun.breakLine && si === lastSi) {
             pieceOpts.breakLine = true;
           }
           return {
             text: seg,
             options: pieceOpts,
           };
+        });
         });
       });
       // Remove color from base options when using rich text runs
@@ -639,20 +695,43 @@ export class ElementConverter {
       if (element.styles.textTransform === 'uppercase') {
         simpleTextContent = simpleTextContent.toUpperCase();
       }
+      const softBreakOpts = {
+        softBreakBefore: true,
+        fontSize: options.fontSize,
+        fontFace: options.fontFace,
+        ...(options.color ? { color: options.color } : {}),
+      };
       if (/\r?\n/.test(simpleTextContent)) {
         const normalized = simpleTextContent.replace(/\r?\n{2,}/g, '\n');
         const parts = normalized.split(/\r?\n/);
-        const softBreakOpts = {
-          softBreakBefore: true,
-          fontSize: options.fontSize,
-          fontFace: options.fontFace,
-          ...(options.color ? { color: options.color } : {}),
-        };
-        textContent = parts.map((part, i) =>
-          i === 0 ? { text: part, options: {} } : { text: part, options: softBreakOpts }
-        );
+        textContent = parts.flatMap((part, i) => {
+          const scriptPieces = this.buildScriptSplitTextPieces(
+            part,
+            element.styles,
+            options,
+            containerHints
+          );
+          if (typeof scriptPieces === 'string') {
+            return i === 0
+              ? [{ text: scriptPieces, options: {} }]
+              : [{ text: scriptPieces, options: softBreakOpts }];
+          }
+          return scriptPieces.map((piece, pi) => ({
+            text: piece.text,
+            options: {
+              ...piece.options,
+              ...(i > 0 && pi === 0 ? softBreakOpts : {}),
+            },
+          }));
+        });
       } else {
-        textContent = simpleTextContent;
+        const scriptPieces = this.buildScriptSplitTextPieces(
+          simpleTextContent,
+          element.styles,
+          options,
+          containerHints
+        );
+        textContent = scriptPieces;
       }
     }
 
@@ -749,8 +828,13 @@ export class ElementConverter {
       if (textGlowData && !skipGlow) {
         textElement._glowData = textGlowData;
       }
-      if (scriptFontFaces) {
-        textElement._scriptFontFaces = scriptFontFaces;
+      if (scriptFontFaces || element.styles.fontFamily || this.platformFontContext) {
+        textElement._scriptFontsMeta = {
+          fontFamily: element.styles.fontFamily,
+          fontFamilySpecified: element.styles.fontFamilySpecified,
+          platform: this.platformFontContext?.platform,
+          scriptFontFaces,
+        };
       }
       if (bodyPrVert) {
         textElement._bodyPrVert = bodyPrVert;
@@ -1018,8 +1102,12 @@ export class ElementConverter {
     const rows = element.tableData.rows.map((row) =>
       row.cells.map((cell) => {
         const cellStyles = cell.styles || {};
-        const cellOptions = getTextOptions(cellStyles, this.platformFontContext);
-        const cellFaces = this.resolveScriptFontFaces(cellStyles);
+        const cellText = sanitizeTextForXml(cell.text);
+        const cellHints = detectContainerScriptHints(cellText);
+        const scriptSegments = splitTextByScript(cellText, cellHints);
+        const primaryScript = scriptSegments[0]?.script ?? 'latin';
+        const cellOptions = getTextOptions(cellStyles, this.platformFontContext, cellText);
+        const cellFaces = this.resolveScriptFontFaces(cellStyles, primaryScript);
         if (cellFaces !== undefined) cellOptions.fontFace = cellFaces.latin;
         const cellFill = getFillOptions(cellStyles);
         const cellBorder = getTableCellBorderOptions(cellStyles);
@@ -1032,8 +1120,19 @@ export class ElementConverter {
         };
         if (cellBorder) options.border = cellBorder;
 
+        let cellTextContent: string | Array<{ text: string; options: Record<string, unknown> }> =
+          cellText;
+        if (scriptSegments.length > 1) {
+          cellTextContent = scriptSegments.map((seg) => {
+            const segOptions = getTextOptions(cellStyles, this.platformFontContext, seg.text);
+            const segFaces = this.resolveScriptFontFaces(cellStyles, seg.script);
+            if (segFaces !== undefined) segOptions.fontFace = segFaces.latin;
+            return { text: seg.text, options: segOptions };
+          });
+        }
+
         return {
-          text: sanitizeTextForXml(cell.text),
+          text: cellTextContent,
           options,
         };
       })

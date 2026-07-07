@@ -12,8 +12,10 @@ import {
   isGenericFontToken,
   isPlatformFontContextActive,
   PlatformFontContext,
+  PlatformFontLang,
   resolveFontFamilyForPlatform,
 } from './platformFontMap';
+import { detectContainerScriptHints, splitTextByScript } from './textScript';
 
 /**
  * Sanitize text for XML/PPTX compatibility - remove control characters that cause Office repair
@@ -220,6 +222,7 @@ export function parsePillFontSize(fontSize: string | undefined): number {
 export interface ParseScriptFontFacesOptions {
   platformFontContext?: PlatformFontContext;
   specifiedFontFamily?: string;
+  textScript?: PlatformFontLang;
 }
 
 /**
@@ -227,11 +230,12 @@ export interface ParseScriptFontFacesOptions {
  */
 export function parseFontFamily(
   fontFamily: string | undefined,
-  ctx?: PlatformFontContext
+  ctx?: PlatformFontContext,
+  lang: PlatformFontLang = 'latin'
 ): string {
   if (!fontFamily) {
     return isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('sans', ctx)
+      ? getPlatformMappedFont('sans', ctx, lang)
       : 'Arial';
   }
 
@@ -239,43 +243,43 @@ export function parseFontFamily(
   const lower = firstFont.toLowerCase();
 
   if (isPlatformFontContextActive(ctx)) {
-    const mapped = getPlatformMappedFontByToken(firstFont, ctx);
+    const mapped = getPlatformMappedFontByToken(firstFont, ctx, lang);
     if (mapped) return mapped;
   }
 
   const fontMap: Record<string, string> = {
     'sans-serif': isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('sans', ctx)
+      ? getPlatformMappedFont('sans', ctx, lang)
       : 'Arial',
     serif: isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('serif', ctx)
+      ? getPlatformMappedFont('serif', ctx, lang)
       : 'Times New Roman',
     monospace: isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('monospace', ctx)
+      ? getPlatformMappedFont('monospace', ctx, lang)
       : 'Courier New',
     cursive: isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('cursive', ctx)
+      ? getPlatformMappedFont('cursive', ctx, lang)
       : 'Comic Sans MS',
     fantasy: isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('fantasy', ctx)
+      ? getPlatformMappedFont('fantasy', ctx, lang)
       : 'Impact',
     math: isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFont('math', ctx)
+      ? getPlatformMappedFont('math', ctx, lang)
       : 'Cambria Math',
     'system-ui': isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFontByToken('system-ui', ctx) ?? getPlatformMappedFont('sans', ctx)
+      ? getPlatformMappedFontByToken('system-ui', ctx, lang) ?? getPlatformMappedFont('sans', ctx, lang)
       : 'Arial',
     'ui-sans-serif': isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFontByToken('ui-sans-serif', ctx) ?? getPlatformMappedFont('sans', ctx)
+      ? getPlatformMappedFontByToken('ui-sans-serif', ctx, lang) ?? getPlatformMappedFont('sans', ctx, lang)
       : 'Arial',
     'ui-serif': isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFontByToken('ui-serif', ctx) ?? getPlatformMappedFont('serif', ctx)
+      ? getPlatformMappedFontByToken('ui-serif', ctx, lang) ?? getPlatformMappedFont('serif', ctx, lang)
       : 'Times New Roman',
     'ui-monospace': isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFontByToken('ui-monospace', ctx) ?? getPlatformMappedFont('monospace', ctx)
+      ? getPlatformMappedFontByToken('ui-monospace', ctx, lang) ?? getPlatformMappedFont('monospace', ctx, lang)
       : 'Courier New',
     '-apple-system': isPlatformFontContextActive(ctx)
-      ? getPlatformMappedFontByToken('-apple-system', ctx) ?? getPlatformMappedFont('sans', ctx)
+      ? getPlatformMappedFontByToken('-apple-system', ctx, lang) ?? getPlatformMappedFont('sans', ctx, lang)
       : 'Arial',
   };
 
@@ -300,16 +304,23 @@ export function parseScriptFontFaces(
 ): ScriptFontFaces {
   const ctx = options?.platformFontContext;
   const specified = options?.specifiedFontFamily;
+  const textScript = options?.textScript ?? 'latin';
   const defaultLatin = isPlatformFontContextActive(ctx)
-    ? getPlatformMappedFont('sans', ctx)
+    ? getPlatformMappedFont('sans', ctx, textScript)
     : 'Arial';
 
   if (!fontFamily && !specified) {
-    return applyPlatformScriptSlots({ latin: defaultLatin, ea: defaultLatin, cs: defaultLatin }, ctx, specified, fontFamily);
+    return applyPlatformScriptSlots(
+      { latin: defaultLatin, ea: defaultLatin, cs: defaultLatin },
+      ctx,
+      textScript,
+      specified,
+      fontFamily
+    );
   }
 
   const effectiveFamily = isPlatformFontContextActive(ctx)
-    ? resolveFontFamilyForPlatform(fontFamily, specified, ctx)
+    ? resolveFontFamilyForPlatform(fontFamily, specified, ctx, textScript)
     : fontFamily;
 
   const tokens = splitFontStack(effectiveFamily ?? '')
@@ -317,19 +328,26 @@ export function parseScriptFontFaces(
     .filter(Boolean);
 
   if (tokens.length === 0) {
-    return applyPlatformScriptSlots({ latin: defaultLatin, ea: defaultLatin, cs: defaultLatin }, ctx, specified, fontFamily);
+    return applyPlatformScriptSlots(
+      { latin: defaultLatin, ea: defaultLatin, cs: defaultLatin },
+      ctx,
+      textScript,
+      specified,
+      fontFamily
+    );
   }
 
-  const latin = parseFontFamily(tokens[0], ctx);
+  const latin = parseFontFamily(tokens[0], ctx, textScript);
   const eaToken = tokens.find((token) => isChineseFont(token));
-  const ea = eaToken ? parseFontFamily(eaToken, ctx) : latin;
+  const ea = eaToken ? parseFontFamily(eaToken, ctx, textScript) : latin;
 
-  return applyPlatformScriptSlots({ latin, ea, cs: 'Arial' }, ctx, specified, fontFamily);
+  return applyPlatformScriptSlots({ latin, ea, cs: 'Arial' }, ctx, textScript, specified, fontFamily);
 }
 
 function applyPlatformScriptSlots(
   faces: ScriptFontFaces,
   ctx?: PlatformFontContext,
+  textScript: PlatformFontLang = 'latin',
   specified?: string,
   computed?: string
 ): ScriptFontFaces {
@@ -338,19 +356,18 @@ function applyPlatformScriptSlots(
   const genericKind = detectStackGenericKind(specified) ?? detectStackGenericKind(computed);
   if (!genericKind) return faces;
 
-  const mapped = getPlatformMappedFont(genericKind, ctx);
-  const { lang } = ctx;
+  const mapped = getPlatformMappedFont(genericKind, ctx, textScript);
 
-  if (lang === 'latin') {
+  if (textScript === 'latin') {
     if (!specified || !stackHasNamedFontLocal(specified)) {
-      return { latin: mapped, ea: mapped, cs: getPlatformMappedFont('sans', ctx) };
+      return { latin: mapped, ea: mapped, cs: getPlatformMappedFont('sans', ctx, 'latin') };
     }
-  } else if (lang === 'sc' || lang === 'tc' || lang === 'jp' || lang === 'kr') {
+  } else if (textScript === 'sc' || textScript === 'tc' || textScript === 'jp' || textScript === 'kr') {
     if (!specified || !stackHasNamedFontLocal(specified)) {
-      return { latin: mapped, ea: mapped, cs: getPlatformMappedFont('sans', ctx) };
+      return { latin: mapped, ea: mapped, cs: getPlatformMappedFont('sans', ctx, textScript) };
     }
     return { ...faces, ea: faces.ea === faces.latin ? mapped : faces.ea };
-  } else if (lang === 'ar' || lang === 'he') {
+  } else if (textScript === 'ar' || textScript === 'he') {
     if (!specified || !stackHasNamedFontLocal(specified)) {
       return { latin: mapped, ea: mapped, cs: mapped };
     }
@@ -839,9 +856,15 @@ export function getOoxmlBodyPrVert(writingMode: string | undefined): string | un
 
 export function getTextOptions(
   styles: ComputedStyles,
-  platformFontContext?: PlatformFontContext
+  platformFontContext?: PlatformFontContext,
+  text?: string
 ): any {
   const options: any = {};
+
+  const textScript =
+    text != null && text.length > 0
+      ? splitTextByScript(text, detectContainerScriptHints(text))[0]?.script ?? 'latin'
+      : 'latin';
 
   const backgroundClip = styles.backgroundClip ?? styles.webkitBackgroundClip;
   const isTextClip = backgroundClip === 'text';
@@ -894,6 +917,7 @@ export function getTextOptions(
     parseScriptFontFaces(styles.fontFamily, {
       platformFontContext,
       specifiedFontFamily: styles.fontFamilySpecified,
+      textScript,
     }).latin;
 
   if (!faFreeFace && isBold(styles.fontWeight)) options.bold = true;

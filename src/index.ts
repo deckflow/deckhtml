@@ -14,7 +14,6 @@ export {
 } from './utils/chineseFonts';
 export {
   buildPlatformFontContext,
-  type ActivePlatformTarget,
   type GenericFontKind,
   type GenericFontName,
   type PlatformFontContext,

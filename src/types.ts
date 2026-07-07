@@ -2,6 +2,8 @@
  * Type definitions for HTML to PPTX converter
  */
 
+import type { PlatformFontLang, PlatformTarget } from './utils/platformFontMap';
+
 export interface ConversionOptions {
   /** Single HTML/SVG input file */
   input?: string;
@@ -17,10 +19,8 @@ export interface ConversionOptions {
   viewportHeight?: number;
   /** Allow loading local file:// subresources in Playwright (default: false). */
   allowLocalResources?: boolean;
-  /** Target PPTX platform for generic font mapping (requires lang). */
-  platform?: 'win' | 'mac';
-  /** Target language/script for generic font mapping (requires platform). */
-  lang?: 'sc' | 'tc' | 'jp' | 'kr' | 'ar' | 'he' | 'latin';
+  /** Target PPTX platform for generic font mapping; script/lang is auto-detected from text. */
+  platform?: PlatformTarget;
   /** Suppress non-essential console.log / console.warn output. */
   quiet?: boolean;
 }
@@ -158,6 +158,8 @@ export interface TextRun {
   breakLine?: boolean;
   /** HTML &lt;br&gt; / soft wrap: same paragraph, pptxgen emits &lt;a:br/&gt; */
   softBreakBefore?: boolean;
+  /** Detected script for this run segment (set when split by charset). */
+  textScript?: PlatformFontLang;
 }
 
 export type ElementType =
@@ -379,6 +381,16 @@ export interface StyleEnhancement {
     latin: string;
     ea: string;
     cs: string;
+  };
+  scriptFontsMeta?: {
+    fontFamily?: string;
+    fontFamilySpecified?: string;
+    platform?: PlatformTarget;
+    scriptFontFaces?: {
+      latin: string;
+      ea: string;
+      cs: string;
+    };
   };
   /** OOXML ST_TextVerticalType for a:bodyPr @vert (e.g. eaVert, vert) */
   bodyPrVert?: string;

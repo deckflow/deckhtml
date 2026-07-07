@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { writeFileSync } from 'fs';
 import path from 'path';
 import { convertHtmlToPptx } from '../../api';
+import type { PlatformTarget } from '../../utils/platformFontMap';
 import { Context } from '../context';
 import {
   deriveOutputPath,
@@ -22,11 +23,14 @@ import { resolveViewport } from '../utils/size';
 const DEFAULT_RENDER_WAIT = 3;
 const DEFAULT_TIMEOUT = 600;
 
+const VALID_PLATFORMS = ['win', 'mac', 'ios', 'android', 'linux'] as const;
+
 export interface ConvertOptions {
   output?: string;
   mode: string;
   format: string;
   width?: string;
+  platform?: string;
   renderWait: string;
   rebuildSvg?: boolean;
   rebuildChart?: boolean;
@@ -35,6 +39,18 @@ export interface ConvertOptions {
   webhook?: string;
   retentionHours?: string;
   report?: boolean;
+}
+
+function parsePlatformOption(platform?: string): PlatformTarget | undefined {
+  if (!platform) return undefined;
+
+  if (!VALID_PLATFORMS.includes(platform as (typeof VALID_PLATFORMS)[number])) {
+    throw new Error(
+      `Invalid --platform: ${platform}. Use win, mac, ios, android, or linux.`
+    );
+  }
+
+  return platform as PlatformTarget;
 }
 
 function parsePositiveInt(value: string, flag: string): number {
@@ -73,6 +89,11 @@ function buildCloudParams(
     params.height = viewport.height;
   }
 
+  const platform = parsePlatformOption(options.platform);
+  if (platform) {
+    params.platform = platform;
+  }
+
   return params;
 }
 
@@ -81,7 +102,8 @@ async function runLocalConvert(
   inputPaths: string[],
   outputPath: string,
   viewport: { width: number; height: number },
-  format: string
+  format: string,
+  platform?: PlatformTarget
 ): Promise<ConversionResultEnvelope> {
   if (format !== 'pptx') {
     throw new Error(
@@ -103,6 +125,13 @@ async function runLocalConvert(
     ctx.quiet,
     `Viewport: ${viewport.width}x${viewport.height}`
   );
+  if (platform) {
+    logVerbose(
+      ctx.verbose,
+      ctx.quiet,
+      `Font mapping: platform=${platform} (script auto-detected from text)`
+    );
+  }
 
   const result = await convertHtmlToPptx({
     inputs: inputPaths,
@@ -110,6 +139,7 @@ async function runLocalConvert(
     viewportHeight: viewport.height,
     allowLocalResources: true,
     quiet: ctx.quiet,
+    platform,
   });
 
   writeFileSync(outputPath, result.data);
@@ -220,6 +250,10 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       'Playwright viewport width (height scales at 16:9)'
     )
     .option(
+      '--platform <platform>',
+      'Target platform for generic font mapping: win, mac, ios, android, linux (script/lang auto-detected from text)'
+    )
+    .option(
       '--render-wait <seconds>',
       'Per-page wait before capture (cloud)',
       String(DEFAULT_RENDER_WAIT)
@@ -273,6 +307,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
             mapMotion: options.mapMotion,
           });
 
+          const platform = parsePlatformOption(options.platform);
+
           const outputPath = deriveOutputPath(
             paths,
             format as 'pptx' | 'pdf' | 'png',
@@ -298,7 +334,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               paths,
               outputPath,
               localViewport,
-              format
+              format,
+              platform
             );
           }
 

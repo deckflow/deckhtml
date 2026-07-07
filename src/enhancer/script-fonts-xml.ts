@@ -1,56 +1,214 @@
 import { StyleEnhancement } from '../types';
+import { buildPlatformFontContext } from '../utils/platformFontMap';
+import { parseScriptFontFaces, ScriptFontFaces } from '../utils/style';
+import {
+  detectContainerScriptHints,
+  scriptToOoxmlLang,
+  splitTextByScript,
+} from '../utils/textScript';
 
 /**
- * Apply script-specific fonts (latin/ea/cs) to a text shape.
+ * Apply script-specific fonts (latin/ea/cs) and lang attributes per text run.
  */
 export function applyScriptFontsToXml(
   slideXml: string,
   enhancement: StyleEnhancement
 ): string {
-  const { elementIndex, scriptFontFaces } = enhancement;
-  if (!scriptFontFaces) return slideXml;
+  const meta = enhancement.scriptFontsMeta;
+  if (!meta?.fontFamily && !meta?.platform && !enhancement.scriptFontFaces) {
+    return slideXml;
+  }
 
   const shapePattern = /<p:sp\b[^>]*>[\s\S]*?<\/p:sp>/g;
   const matches = [...slideXml.matchAll(shapePattern)];
 
-  if (elementIndex >= matches.length) {
-    console.warn(`Script fonts: element index ${elementIndex} out of bounds (total: ${matches.length})`);
+  if (enhancement.elementIndex >= matches.length) {
+    console.warn(
+      `Script fonts: element index ${enhancement.elementIndex} out of bounds (total: ${matches.length})`
+    );
     return slideXml;
   }
 
-  const targetMatch = matches[elementIndex];
+  const targetMatch = matches[enhancement.elementIndex];
   const targetShape = targetMatch[0];
   const targetStart = targetMatch.index!;
   const targetEnd = targetStart + targetShape.length;
 
-  let updatedShape = targetShape
-    .replace(/(<a:latin\b[^>]*\btypeface=")[^"]*("[^>]*\/>)/g, `$1${scriptFontFaces.latin}$2`)
-    .replace(/(<a:ea\b[^>]*\btypeface=")[^"]*("[^>]*\/>)/g, `$1${scriptFontFaces.ea}$2`)
-    .replace(/(<a:cs\b[^>]*\btypeface=")[^"]*("[^>]*\/>)/g, `$1${scriptFontFaces.cs}$2`);
+  const platformCtx = meta?.platform ? buildPlatformFontContext({ platform: meta.platform }) : undefined;
+  const shapeText = extractShapeText(targetShape);
+  const containerHints = detectContainerScriptHints(shapeText);
 
-  // Set run language by text content: Chinese -> zh-CN, otherwise en-US.
-  updatedShape = updatedShape.replace(/<a:r\b[^>]*>[\s\S]*?<\/a:r>/g, (runXml) => {
-    const textMatch = runXml.match(/<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/);
-    const runText = textMatch?.[1] ?? '';
-    if (!runText.trim()) return runXml;
-
-    const lang = hasChineseChars(runText) ? 'zh-CN' : 'en-US';
-    return runXml.replace(/<a:rPr\b([^>]*)>/, (full, attrs) => {
-      const nextAttrs = upsertLangAttr(attrs, lang);
-      return `<a:rPr${nextAttrs}>`;
-    });
-  });
+  const updatedShape = targetShape.replace(
+    /<a:p\b[^>]*>[\s\S]*?<\/a:p>/g,
+    (paragraphXml) => processParagraph(paragraphXml, meta, platformCtx, containerHints, enhancement.scriptFontFaces)
+  );
 
   return slideXml.substring(0, targetStart) + updatedShape + slideXml.substring(targetEnd);
 }
 
-function hasChineseChars(s: string): boolean {
-  return /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(s);
+function extractShapeText(shapeXml: string): string {
+  const texts: string[] = [];
+  const re = /<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(shapeXml)) !== null) {
+    texts.push(decodeXmlText(match[1] ?? ''));
+  }
+  return texts.join('');
 }
 
-function upsertLangAttr(attrs: string, lang: 'zh-CN' | 'en-US'): string {
-  if (/\slang="[^"]*"/.test(attrs)) {
-    return attrs.replace(/\slang="[^"]*"/, ` lang="${lang}"`);
+function decodeXmlText(text: string): string {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function encodeXmlText(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function processParagraph(
+  paragraphXml: string,
+  meta: StyleEnhancement['scriptFontsMeta'],
+  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  containerHints: ReturnType<typeof detectContainerScriptHints>,
+  fallbackFaces?: ScriptFontFaces
+): string {
+  const openTagMatch = paragraphXml.match(/^<a:p\b[^>]*>/);
+  const openTag = openTagMatch?.[0] ?? '<a:p>';
+  const inner = paragraphXml.slice(openTag.length, paragraphXml.lastIndexOf('</a:p>'));
+  const pPrMatch = inner.match(/^<a:pPr\b[^>]*>[\s\S]*?<\/a:pPr>/);
+  const pPr = pPrMatch?.[0] ?? '';
+  const body = pPr ? inner.slice(pPr.length) : inner;
+
+  const processedRuns = body.replace(/<a:r\b[^>]*>[\s\S]*?<\/a:r>/g, (runXml) =>
+    splitAndEnhanceRun(runXml, meta, platformCtx, containerHints, fallbackFaces)
+  );
+
+  return `${openTag}${pPr}${processedRuns}</a:p>`;
+}
+
+function splitAndEnhanceRun(
+  runXml: string,
+  meta: StyleEnhancement['scriptFontsMeta'],
+  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  containerHints: ReturnType<typeof detectContainerScriptHints>,
+  fallbackFaces?: ScriptFontFaces
+): string {
+  const textMatch = runXml.match(/<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/);
+  const rawText = textMatch?.[1] ?? '';
+  const decodedText = decodeXmlText(rawText);
+  const segments = splitTextByScript(decodedText, containerHints);
+
+  if (segments.length <= 1) {
+    return enhanceSingleRun(runXml, segments[0]?.script ?? 'latin', meta, platformCtx, fallbackFaces);
   }
-  return `${attrs} lang="${lang}"`;
+
+  const rPrMatch = runXml.match(/<a:rPr\b[^>]*>[\s\S]*?<\/a:rPr>/);
+  const rPr = rPrMatch?.[0] ?? '<a:rPr/>';
+  const brMatch = runXml.match(/<a:br\b[^>]*\/>/);
+  const br = brMatch?.[0] ?? '';
+
+  return segments
+    .map((seg) => {
+      const enhancedRPr = applyRunFontSlots(
+        rPr,
+        seg.script,
+        meta,
+        platformCtx,
+        fallbackFaces
+      );
+      const encoded = encodeXmlText(seg.text);
+      return `<a:r>${enhancedRPr}${br}<a:t>${encoded}</a:t></a:r>`;
+    })
+    .join('');
+}
+
+function enhanceSingleRun(
+  runXml: string,
+  script: import('../utils/platformFontMap').PlatformFontLang,
+  meta: StyleEnhancement['scriptFontsMeta'],
+  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  fallbackFaces?: ScriptFontFaces
+): string {
+  return runXml.replace(/<a:rPr\b[^>]*>[\s\S]*?<\/a:rPr>/, (rPr) =>
+    applyRunFontSlots(rPr, script, meta, platformCtx, fallbackFaces)
+  );
+}
+
+function applyRunFontSlots(
+  rPrXml: string,
+  script: import('../utils/platformFontMap').PlatformFontLang,
+  meta: StyleEnhancement['scriptFontsMeta'],
+  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  fallbackFaces?: ScriptFontFaces
+): string {
+  const ooxmlLang = scriptToOoxmlLang(script);
+  let updated = upsertLangAttr(rPrXml, ooxmlLang);
+
+  const faces =
+    meta?.fontFamily && platformCtx
+      ? parseScriptFontFaces(meta.fontFamily, {
+          platformFontContext: platformCtx,
+          specifiedFontFamily: meta.fontFamilySpecified,
+          textScript: script,
+        })
+      : fallbackFaces;
+
+  if (!faces) return updated;
+
+  updated = upsertScriptTypeface(updated, 'latin', faces.latin);
+  updated = upsertScriptTypeface(updated, 'ea', faces.ea);
+  updated = upsertScriptTypeface(updated, 'cs', faces.cs);
+  return updated;
+}
+
+function upsertLangAttr(rPrXml: string, lang: string): string {
+  if (/<a:rPr\b[^>]*\/>/.test(rPrXml)) {
+    return rPrXml.replace(/<a:rPr\b([^>]*)\/>/, `<a:rPr$1 lang="${lang}"/>`);
+  }
+  if (/\slang="[^"]*"/.test(rPrXml)) {
+    return rPrXml.replace(/\slang="[^"]*"/, ` lang="${lang}"`);
+  }
+  return rPrXml.replace(/<a:rPr\b/, `<a:rPr lang="${lang}"`);
+}
+
+function upsertScriptTypeface(rPrXml: string, tag: 'latin' | 'ea' | 'cs', typeface: string): string {
+  const selfClosing = new RegExp(`<a:${tag}\\b[^>]*\\/>`);
+  const withBody = new RegExp(`<a:${tag}\\b[^>]*>[\\s\\S]*?<\\/a:${tag}>`);
+
+  if (selfClosing.test(rPrXml)) {
+    return rPrXml.replace(
+      new RegExp(`(<a:${tag}\\b[^>]*\\btypeface=")[^"]*(")`),
+      `$1${typeface}$2`
+    ).replace(
+      new RegExp(`<a:${tag}\\b([^>]*)\\/>`),
+      (full, attrs) => {
+        if (/\btypeface="/.test(attrs)) return full;
+        return `<a:${tag}${attrs} typeface="${typeface}"/>`;
+      }
+    );
+  }
+
+  if (withBody.test(rPrXml)) {
+    return rPrXml.replace(
+      new RegExp(`(<a:${tag}\\b[^>]*\\btypeface=")[^"]*(")`),
+      `$1${typeface}$2`
+    );
+  }
+
+  const insertPoint = rPrXml.lastIndexOf('</a:rPr>');
+  if (insertPoint === -1) {
+    return rPrXml.replace(/\/>$/, `><a:${tag} typeface="${typeface}"/></a:rPr>`);
+  }
+  return (
+    rPrXml.slice(0, insertPoint) +
+    `<a:${tag} typeface="${typeface}"/>` +
+    rPrXml.slice(insertPoint)
+  );
 }

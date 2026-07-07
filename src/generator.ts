@@ -254,14 +254,15 @@ export class PPTXGenerator {
             delete converted._sourceElement;
           }
 
-          if (converted._scriptFontFaces) {
+          if (converted._scriptFontsMeta) {
             this.registry.register({
               slideIndex,
               elementIndex: currentShapeIndex ?? elementIndex,
               type: 'scriptFonts',
-              scriptFontFaces: converted._scriptFontFaces,
+              scriptFontsMeta: converted._scriptFontsMeta,
+              scriptFontFaces: converted._scriptFontsMeta.scriptFontFaces,
             });
-            delete converted._scriptFontFaces;
+            delete converted._scriptFontsMeta;
           }
 
           if (converted._bodyPrVert) {

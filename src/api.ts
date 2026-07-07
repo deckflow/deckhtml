@@ -23,6 +23,10 @@ import {
   normalizeFontAwesomeFreeFamily,
   parseScriptFontFaces,
 } from './utils/style';
+import {
+  detectContainerScriptHints,
+  splitTextByScript,
+} from './utils/textScript';
 import { buildPlatformFontContext, PlatformFontContext } from './utils/platformFontMap';
 import { runQuietly } from './utils/quiet';
 
@@ -81,7 +85,7 @@ function collectFontsFromElements(
   platformFontContext: PlatformFontContext | undefined,
   usedFontsMap: Map<string, UsedFontDescriptor>
 ): void {
-  const documentUsesChineseFont = elements.some(
+  const documentUsesChineseFont = !platformFontContext && elements.some(
     (el) =>
       isChineseFont(el.styles?.fontFamily ?? '') ||
       el.richText?.some((run) => isChineseFont(run.styles?.fontFamily ?? ''))
@@ -96,7 +100,17 @@ function collectFontsFromElements(
     usedFontsMap.set(key, { fontFamily, bold, italic });
   };
 
-  const addFont = (styles: ElementInfo['styles']) => {
+  const collectTextScripts = (text: string, containerText: string) => {
+    const hints = detectContainerScriptHints(containerText || text);
+    return splitTextByScript(text, hints).map((seg) => seg.script);
+  };
+
+  const getElementText = (el: ElementInfo): string => {
+    if (el.richText?.length) return el.richText.map((run) => run.text).join('');
+    return el.content ?? '';
+  };
+
+  const addFont = (styles: ElementInfo['styles'], texts: string[], containerText: string) => {
     if (!styles?.fontFamily) return;
     const faFreeFace = normalizeFontAwesomeFreeFamily(
       styles.fontFamily,
@@ -106,22 +120,41 @@ function collectFontsFromElements(
       registerFont(faFreeFace, styles, false);
       return;
     }
-    const stackHasChinese = isChineseFont(styles.fontFamily);
-    if (!stackHasChinese && documentUsesChineseFont) return;
 
-    const faces = parseScriptFontFaces(styles.fontFamily, {
-      platformFontContext,
-      specifiedFontFamily: styles.fontFamilySpecified,
-    });
-    registerFont(faces.latin, styles);
-    if (stackHasChinese && faces.ea !== faces.latin) {
-      registerFont(faces.ea, styles);
+    const scripts = new Set(
+      texts.flatMap((text) => collectTextScripts(text, containerText))
+    );
+    if (scripts.size === 0) scripts.add('latin');
+
+    const stackHasChinese = isChineseFont(styles.fontFamily);
+    if (!platformFontContext && !stackHasChinese && documentUsesChineseFont) return;
+
+    for (const textScript of scripts) {
+      const faces = parseScriptFontFaces(styles.fontFamily, {
+        platformFontContext,
+        specifiedFontFamily: styles.fontFamilySpecified,
+        textScript,
+      });
+      registerFont(faces.latin, styles);
+      if (faces.ea !== faces.latin) {
+        registerFont(faces.ea, styles);
+      }
+      if (faces.cs !== faces.latin && faces.cs !== faces.ea) {
+        registerFont(faces.cs, styles);
+      }
     }
   };
 
   elements.forEach((el) => {
-    addFont(el.styles);
-    el.richText?.forEach((run) => addFont(run.styles));
+    const containerText = getElementText(el);
+    addFont(el.styles, [containerText], containerText);
+    el.richText?.forEach((run) => addFont(run.styles, [run.text], containerText));
+
+    el.tableData?.rows.forEach((row) => {
+      row.cells.forEach((cell) => {
+        addFont(cell.styles ?? el.styles, [cell.text], cell.text);
+      });
+    });
   });
 }
 
