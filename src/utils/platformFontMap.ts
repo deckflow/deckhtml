@@ -10,6 +10,9 @@ import { GENERIC_FONT_OS_MAP, PlatformFontMappingEntry } from './platformFontMap
 /** PPTX target platforms with full mapping tables. */
 export type PlatformTarget = 'win' | 'mac' | 'ios' | 'android' | 'linux';
 
+/** Default platform when callers omit `platform` (programmatic API). */
+export const DEFAULT_PLATFORM_TARGET: PlatformTarget = 'win';
+
 export type PlatformFontLang = 'sc' | 'tc' | 'jp' | 'kr' | 'ar' | 'he' | 'latin';
 
 /** CSS generic font-family keywords (each may map to a different OS font). */
@@ -251,13 +254,24 @@ export function resolveFontFamilyForPlatform(
   return resolved;
 }
 
+/** Map Node.js `process.platform` to a PPTX font-mapping target. */
+export function detectCurrentPlatformTarget(): PlatformTarget {
+  switch (process.platform) {
+    case 'win32':
+      return 'win';
+    case 'darwin':
+      return 'mac';
+    case 'linux':
+      return 'linux';
+    default:
+      return DEFAULT_PLATFORM_TARGET;
+  }
+}
+
 export function buildPlatformFontContext(options: {
   platform?: PlatformTarget;
-}): PlatformFontContext | undefined {
-  if (options.platform) {
-    return { platform: options.platform };
-  }
-  return undefined;
+} = {}): PlatformFontContext {
+  return { platform: options.platform ?? DEFAULT_PLATFORM_TARGET };
 }
 
 export { GENERIC_FONT_OS_MAP, type PlatformFontMappingEntry };

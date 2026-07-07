@@ -1,5 +1,5 @@
 import { StyleEnhancement } from '../types';
-import { buildPlatformFontContext } from '../utils/platformFontMap';
+import { buildPlatformFontContext, PlatformFontContext } from '../utils/platformFontMap';
 import { parseScriptFontFaces, ScriptFontFaces } from '../utils/style';
 import {
   detectContainerScriptHints,
@@ -75,7 +75,7 @@ function encodeXmlText(text: string): string {
 function processParagraph(
   paragraphXml: string,
   meta: StyleEnhancement['scriptFontsMeta'],
-  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  platformCtx: PlatformFontContext | undefined,
   containerHints: ReturnType<typeof detectContainerScriptHints>,
   fallbackFaces?: ScriptFontFaces
 ): string {
@@ -96,7 +96,7 @@ function processParagraph(
 function splitAndEnhanceRun(
   runXml: string,
   meta: StyleEnhancement['scriptFontsMeta'],
-  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  platformCtx: PlatformFontContext | undefined,
   containerHints: ReturnType<typeof detectContainerScriptHints>,
   fallbackFaces?: ScriptFontFaces
 ): string {
@@ -133,7 +133,7 @@ function enhanceSingleRun(
   runXml: string,
   script: import('../utils/platformFontMap').PlatformFontLang,
   meta: StyleEnhancement['scriptFontsMeta'],
-  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  platformCtx: PlatformFontContext | undefined,
   fallbackFaces?: ScriptFontFaces
 ): string {
   return runXml.replace(/<a:rPr\b[^>]*>[\s\S]*?<\/a:rPr>/, (rPr) =>
@@ -145,7 +145,7 @@ function applyRunFontSlots(
   rPrXml: string,
   script: import('../utils/platformFontMap').PlatformFontLang,
   meta: StyleEnhancement['scriptFontsMeta'],
-  platformCtx: ReturnType<typeof buildPlatformFontContext>,
+  platformCtx: PlatformFontContext | undefined,
   fallbackFaces?: ScriptFontFaces
 ): string {
   const ooxmlLang = scriptToOoxmlLang(script);

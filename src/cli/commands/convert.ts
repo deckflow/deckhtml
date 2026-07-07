@@ -3,7 +3,10 @@ import { Command } from 'commander';
 import { writeFileSync } from 'fs';
 import path from 'path';
 import { convertHtmlToPptx } from '../../api';
-import type { PlatformTarget } from '../../utils/platformFontMap';
+import {
+  detectCurrentPlatformTarget,
+  type PlatformTarget,
+} from '../../utils/platformFontMap';
 import { Context } from '../context';
 import {
   deriveOutputPath,
@@ -41,8 +44,8 @@ export interface ConvertOptions {
   report?: boolean;
 }
 
-function parsePlatformOption(platform?: string): PlatformTarget | undefined {
-  if (!platform) return undefined;
+function resolvePlatformOption(platform?: string): PlatformTarget {
+  if (!platform) return detectCurrentPlatformTarget();
 
   if (!VALID_PLATFORMS.includes(platform as (typeof VALID_PLATFORMS)[number])) {
     throw new Error(
@@ -64,6 +67,7 @@ function parsePositiveInt(value: string, flag: string): number {
 function buildCloudParams(
   ctx: Context,
   options: ConvertOptions,
+  platform: PlatformTarget,
   viewport?: { width: number; height: number }
 ): Record<string, unknown> {
   const retentionHours = options.retentionHours
@@ -89,10 +93,7 @@ function buildCloudParams(
     params.height = viewport.height;
   }
 
-  const platform = parsePlatformOption(options.platform);
-  if (platform) {
-    params.platform = platform;
-  }
+  params.platform = platform;
 
   return params;
 }
@@ -103,7 +104,7 @@ async function runLocalConvert(
   outputPath: string,
   viewport: { width: number; height: number },
   format: string,
-  platform?: PlatformTarget
+  platform: PlatformTarget
 ): Promise<ConversionResultEnvelope> {
   if (format !== 'pptx') {
     throw new Error(
@@ -125,13 +126,11 @@ async function runLocalConvert(
     ctx.quiet,
     `Viewport: ${viewport.width}x${viewport.height}`
   );
-  if (platform) {
-    logVerbose(
-      ctx.verbose,
-      ctx.quiet,
-      `Font mapping: platform=${platform} (script auto-detected from text)`
-    );
-  }
+  logVerbose(
+    ctx.verbose,
+    ctx.quiet,
+    `Font mapping: platform=${platform} (script auto-detected from text)`
+  );
 
   const result = await convertHtmlToPptx({
     inputs: inputPaths,
@@ -160,6 +159,7 @@ async function runCloudConvert(
   inputPaths: string[],
   outputPath: string,
   options: ConvertOptions,
+  platform: PlatformTarget,
   viewport: { width: number; height: number } | undefined,
   format: string
 ): Promise<ConversionResultEnvelope> {
@@ -175,7 +175,7 @@ async function runCloudConvert(
     );
   }
 
-  const params = buildCloudParams(ctx, options, viewport);
+  const params = buildCloudParams(ctx, options, platform, viewport);
   const taskName = path.basename(inputPaths[0]!, path.extname(inputPaths[0]!));
 
   logProgress(ctx.quiet, `Uploading ${inputPaths.length} file(s)...`);
@@ -251,7 +251,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     )
     .option(
       '--platform <platform>',
-      'Target platform for generic font mapping: win, mac, ios, android, linux (script/lang auto-detected from text)'
+      'Target platform for generic font mapping: win, mac, ios, android, linux (default: current OS; script/lang auto-detected from text)'
     )
     .option(
       '--render-wait <seconds>',
@@ -307,7 +307,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
             mapMotion: options.mapMotion,
           });
 
-          const platform = parsePlatformOption(options.platform);
+          const platform = resolvePlatformOption(options.platform);
 
           const outputPath = deriveOutputPath(
             paths,
@@ -325,6 +325,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               paths,
               outputPath,
               options,
+              platform,
               cloudViewport,
               format
             );
