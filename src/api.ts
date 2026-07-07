@@ -231,6 +231,11 @@ async function processSingleInput(
       }
       const ruleHint = discovered.rule ?? discovered.selector;
       console.log(`📑 Multi-slide mode: ${discovered.count} pages (rule: ${ruleHint})`);
+      if (discovered.activeDeck) {
+        console.log(
+          `🎴 Active-gated deck detected (class: .${discovered.activeDeck.activeClass}, ${discovered.count} slides)`
+        );
+      }
 
       const inspectOptions = { inputIsSvg };
       const slideConcurrency =

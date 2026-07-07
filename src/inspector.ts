@@ -22,11 +22,18 @@ export interface SlideProbeRule {
   topLevelAncestorSelector?: string;
 }
 
+/** Metadata for slide decks gated by a mutually-exclusive CSS class (e.g. `.active`). */
+export interface ActiveGatedDeckInfo {
+  activeClass: string;
+}
+
 export interface SlideContainerDiscovery {
   selector: string;
   count: number;
   /** Matched probe rule label, or `explicit` / `none`. */
   rule?: string;
+  /** Present when slides are stacked and visibility is toggled via a CSS class. */
+  activeDeck?: ActiveGatedDeckInfo;
 }
 
 export interface InspectElementsOptions {
@@ -44,6 +51,17 @@ const SLIDE_HEIGHT_MAX_RATIO = 2.0;
 /** Qualified slide host width must be at least this fraction of viewport slide width. */
 const SLIDE_WIDTH_MIN_RATIO = 0.8;
 const SLIDE_MIN_MATCHES = 2;
+/** Stacked deck hosts with nearly identical rects are considered co-located within this tolerance. */
+const STACKED_RECT_TOLERANCE_PX = 5;
+/** Class names tried first when inferring active-gated deck toggles. */
+const ACTIVE_DECK_CLASS_CANDIDATES = [
+  'active',
+  'is-active',
+  'current',
+  'show',
+  'visible',
+  'is-current',
+];
 
 /**
  * Ordered probe rules for multi-page HTML. First rule with enough qualified
@@ -51,6 +69,8 @@ const SLIDE_MIN_MATCHES = 2;
  */
 export const SLIDE_PROBE_RULES: SlideProbeRule[] = [
   { label: '.slide-container', selector: '.slide-container' },
+  { label: '.slide-wrap', selector: '.slide-wrap' },
+  { label: 'section[class*="slide"]', selector: 'section[class*="slide"]' },
   { label: '.slide', selector: '.slide' },
   { label: '[data-slide]', selector: '[data-slide]' },
   { label: 'section.slide', selector: 'section.slide' },
@@ -276,8 +296,10 @@ export class ElementInspector {
     autoDetect: boolean = true
   ): Promise<SlideContainerDiscovery> {
     const explicit = selector?.trim() || '';
+    let discovery: SlideContainerDiscovery;
+
     if (explicit) {
-      return this.page.evaluate(
+      discovery = await this.page.evaluate(
         ({ explicitSelector, indexAttr }) => {
           const nodes = Array.from(document.querySelectorAll(explicitSelector));
           nodes.forEach((node, i) => node.setAttribute(indexAttr, String(i)));
@@ -289,13 +311,23 @@ export class ElementInspector {
         },
         { explicitSelector: explicit, indexAttr: SLIDE_INDEX_ATTR }
       );
+    } else if (autoDetect) {
+      discovery = await this.discoverByProbeRules();
+    } else {
+      discovery = this.emptySlideDiscovery();
     }
 
-    if (autoDetect) {
-      return this.discoverByProbeRules();
-    }
+    return this.enrichDiscoveryWithActiveDeck(discovery);
+  }
 
-    return this.emptySlideDiscovery();
+  /** Attach active-gated deck metadata when tagged slide hosts match deck heuristics. */
+  private async enrichDiscoveryWithActiveDeck(
+    discovery: SlideContainerDiscovery
+  ): Promise<SlideContainerDiscovery> {
+    if (discovery.count < SLIDE_MIN_MATCHES) return discovery;
+    const activeDeck = await this.detectActiveGatedDeck();
+    if (!activeDeck) return discovery;
+    return { ...discovery, activeDeck };
   }
 
   private emptySlideDiscovery(): SlideContainerDiscovery {
@@ -394,10 +426,16 @@ export class ElementInspector {
           }
         }
 
+        // Prefer outer deck hosts when probe matches nested nodes (e.g. .slide inside .slide-wrap).
+        const outerHosts = qualified.filter(
+          (node) =>
+            !qualified.some((other) => other !== node && other.contains(node))
+        );
+
         document.querySelectorAll(`[${indexAttr}]`).forEach((node) => {
           node.removeAttribute(indexAttr);
         });
-        qualified.forEach((node, slideIdx) => {
+        outerHosts.forEach((node, slideIdx) => {
           node.setAttribute(indexAttr, String(slideIdx));
         });
         document.querySelectorAll(`[${candidateAttr}]`).forEach((node) => {
@@ -406,7 +444,7 @@ export class ElementInspector {
 
         return {
           selector: `[${indexAttr}]`,
-          count: qualified.length,
+          count: outerHosts.length,
           rule: ruleLabel,
         };
       },
@@ -432,6 +470,76 @@ export class ElementInspector {
     );
   }
 
+  /**
+   * Detect slide decks where exactly one stacked sibling is visible and a CSS class
+   * (e.g. `.active`) gates visibility across co-located hosts.
+   */
+  private async detectActiveGatedDeck(): Promise<ActiveGatedDeckInfo | undefined> {
+    return this.page.evaluate(
+      ({ indexAttr, classCandidates, rectTolerance }) => {
+        const hosts = Array.from(document.querySelectorAll(`[${indexAttr}]`));
+        if (hosts.length < 2) return undefined;
+
+        const parent = hosts[0].parentElement;
+        if (!parent || !hosts.every((host) => host.parentElement === parent)) {
+          return undefined;
+        }
+
+        const isStackedHost = (host: Element): boolean => {
+          const style = window.getComputedStyle(host);
+          if (style.position !== 'absolute' && style.position !== 'fixed') {
+            return false;
+          }
+          if (!(host instanceof HTMLElement)) return false;
+          const first = hosts[0];
+          if (!(first instanceof HTMLElement)) return false;
+          // Use layout dimensions — inactive slides may be offset by CSS transform.
+          return (
+            Math.abs(host.offsetWidth - first.offsetWidth) <= rectTolerance &&
+            Math.abs(host.offsetHeight - first.offsetHeight) <= rectTolerance
+          );
+        };
+
+        if (!hosts.every(isStackedHost)) return undefined;
+
+        const isVisible = (host: Element): boolean => {
+          const style = window.getComputedStyle(host);
+          const opacity = parseFloat(style.opacity);
+          return style.visibility !== 'hidden' && !Number.isNaN(opacity) && opacity > 0.01;
+        };
+
+        const visibleHosts = hosts.filter(isVisible);
+        if (visibleHosts.length !== 1) return undefined;
+
+        const visible = visibleHosts[0];
+        const hidden = hosts.find((host) => host !== visible);
+        if (!hidden) return undefined;
+
+        const inferActiveClass = (): string | undefined => {
+          for (const className of classCandidates) {
+            if (visible.classList.contains(className) && !hidden.classList.contains(className)) {
+              return className;
+            }
+          }
+          for (const className of Array.from(visible.classList)) {
+            if (!hidden.classList.contains(className)) return className;
+          }
+          return undefined;
+        };
+
+        const activeClass = inferActiveClass();
+        if (!activeClass) return undefined;
+
+        return { activeClass };
+      },
+      {
+        indexAttr: SLIDE_INDEX_ATTR,
+        classCandidates: ACTIVE_DECK_CLASS_CANDIDATES,
+        rectTolerance: STACKED_RECT_TOLERANCE_PX,
+      }
+    );
+  }
+
   private async waitForLayoutSettle(): Promise<void> {
     await this.page.evaluate(
       () =>
@@ -452,7 +560,8 @@ export class ElementInspector {
    * (keep the container, its descendants, and ancestor chain visible).
    */
   private async isolateOutsideSlideContainer(
-    slideSelector: string
+    slideSelector: string,
+    discovery?: SlideContainerDiscovery
   ): Promise<void> {
     await this.page.evaluate(
       ({ slideSelector, hiddenAttr }) => {
@@ -495,31 +604,68 @@ export class ElementInspector {
       },
       { slideSelector, hiddenAttr: SLIDE_ISOLATION_ATTR }
     );
-    await this.prepareSlideContainerForInspect(slideSelector);
+    await this.prepareSlideContainerForInspect(slideSelector, discovery);
     await this.waitForLayoutSettle();
     await this.waitForSlideAnimationSettle();
   }
 
   /** Scroll-reveal hooks leave `.reveal` at opacity:0 until scrolled; fix before inspect. */
   private async prepareSlideContainerForInspect(
-    slideSelector: string
+    slideSelector: string,
+    discovery?: SlideContainerDiscovery
   ): Promise<void> {
-    await this.page.evaluate((sel) => {
-      const host = document.querySelector(sel);
-      if (!(host instanceof HTMLElement)) return;
-      host.scrollIntoView({ block: 'start', inline: 'nearest' });
-      const nodes = [
-        host,
-        ...Array.from(host.querySelectorAll('.reveal')),
-      ].filter((n): n is HTMLElement => n instanceof HTMLElement);
-      for (const node of nodes) {
-        node.classList.add('show');
-        node.style.setProperty('transition', 'none', 'important');
-        node.style.setProperty('animation', 'none', 'important');
-        node.style.setProperty('opacity', '1', 'important');
-        node.style.setProperty('transform', 'none', 'important');
+    await this.page.evaluate(
+      ({ sel, activeClass }) => {
+        const host = document.querySelector(sel);
+        if (!(host instanceof HTMLElement)) return;
+
+        if (activeClass) {
+          const deckParent = host.parentElement;
+          if (deckParent) {
+            for (const sibling of Array.from(deckParent.children)) {
+              sibling.classList.remove(activeClass);
+            }
+            host.classList.add(activeClass);
+          }
+        }
+
+        host.scrollIntoView({ block: 'start', inline: 'nearest' });
+        const nodes = [
+          host,
+          ...Array.from(host.querySelectorAll('.reveal')),
+        ].filter((n): n is HTMLElement => n instanceof HTMLElement);
+
+        for (const node of nodes) {
+          let current: Element | null = node;
+          while (current) {
+            if (current instanceof HTMLElement || current instanceof SVGElement) {
+              current.style.setProperty('transition', 'none', 'important');
+              current.style.setProperty('animation', 'none', 'important');
+              current.style.setProperty('visibility', 'visible', 'important');
+              current.style.setProperty('opacity', '1', 'important');
+              current.style.setProperty('transform', 'none', 'important');
+            }
+            current = current.parentElement;
+          }
+          node.classList.add('show');
+        }
+
+        host.querySelectorAll('[data-target]').forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          const target = parseFloat(el.dataset.target ?? '');
+          if (Number.isNaN(target)) return;
+          const decimals = parseInt(el.dataset.decimals ?? '0', 10);
+          const suffix = el.dataset.suffix ?? '';
+          const prefix = el.dataset.prefix ?? '';
+          el.textContent = `${prefix}${target.toFixed(decimals)}${suffix}`;
+          delete el.dataset.done;
+        });
+      },
+      {
+        sel: slideSelector,
+        activeClass: discovery?.activeDeck?.activeClass ?? null,
       }
-    }, slideSelector);
+    );
   }
 
   private async clearPptxMappedAttributes(): Promise<void> {
@@ -607,7 +753,7 @@ export class ElementInspector {
   ): Promise<ElementInfo[]> {
     const slideSelector = `[${SLIDE_INDEX_ATTR}="${slideIndex}"]`;
     await this.clearPptxMappedAttributes();
-    await this.isolateOutsideSlideContainer(slideSelector);
+    await this.isolateOutsideSlideContainer(slideSelector, discovery);
     const origin = await this.getSlideContainerOrigin(slideIndex, discovery.selector);
     const elements = await this.inspectElements(undefined, options);
     this.normalizeElementCoords(elements, origin);
