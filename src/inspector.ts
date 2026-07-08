@@ -20,6 +20,11 @@ export interface SlideProbeRule {
    * (e.g. top-level `section` only).
    */
   topLevelAncestorSelector?: string;
+  /**
+   * When true, slide hosts may include size-qualified direct siblings of probe
+   * matches (e.g. header.hero next to section). Named slide-class rules default false.
+   */
+  expandSiblingHosts?: boolean;
 }
 
 /** Metadata for slide decks gated by a mutually-exclusive CSS class (e.g. `.active`). */
@@ -78,6 +83,7 @@ export const SLIDE_PROBE_RULES: SlideProbeRule[] = [
     label: 'section',
     selector: 'section',
     topLevelAncestorSelector: 'section',
+    expandSiblingHosts: true,
   },
 ];
 
@@ -367,7 +373,7 @@ export class ElementInspector {
       }
 
       const discovery = await this.finalizeSlidesFromProbeParents(
-        rule.label,
+        rule,
         slideHeight,
         slideWidth
       );
@@ -383,44 +389,80 @@ export class ElementInspector {
   }
 
   /**
-   * Probe matches locate slide parent(s); qualify every direct child whose height
-   * is within [50%, 200%] × slide height and width is at least 80% × slide width
-   * (includes siblings not matched by probe, e.g. header.hero next to section).
+   * Qualify slide hosts from probe matches. Named slide-class rules use probe hits
+   * only; generic section rule may expand to size-qualified siblings (e.g. header.hero).
    */
   private async finalizeSlidesFromProbeParents(
-    ruleLabel: string,
+    probeRule: SlideProbeRule,
     slideHeight: number,
     slideWidth: number
   ): Promise<SlideContainerDiscovery> {
     const minH = slideHeight * SLIDE_HEIGHT_MIN_RATIO;
     const maxH = slideHeight * SLIDE_HEIGHT_MAX_RATIO;
     const minW = slideWidth * SLIDE_WIDTH_MIN_RATIO;
+    const expandSiblingHosts = probeRule.expandSiblingHosts === true;
 
     return this.page.evaluate(
-      ({ candidateAttr, indexAttr, ruleLabel, minH, maxH, minW }) => {
-        const candidates = Array.from(
-          document.querySelectorAll(`[${candidateAttr}]`)
-        );
-        const seenParents = new Set<Element>();
-        const parents: Element[] = [];
-        for (const candidate of candidates) {
-          const parent = candidate.parentElement;
-          if (!parent || seenParents.has(parent)) continue;
-          seenParents.add(parent);
-          parents.push(parent);
-        }
-        parents.sort((a, b) => {
+      ({ candidateAttr, indexAttr, ruleLabel, minH, maxH, minW, expandSiblingHosts }) => {
+        const sortDocumentOrder = (a: Element, b: Element): number => {
           const pos = a.compareDocumentPosition(b);
           if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
           if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
           return 0;
-        });
+        };
 
-        const qualified: Element[] = [];
-        for (const parent of parents) {
-          for (const child of Array.from(parent.children)) {
-            const rect = child.getBoundingClientRect();
-            if (rect.height >= minH && rect.height <= maxH && rect.width >= minW) {
+        const qualifiesSize = (el: Element): boolean => {
+          const rect = el.getBoundingClientRect();
+          return rect.height >= minH && rect.height <= maxH && rect.width >= minW;
+        };
+
+        const hasMeaningfulContent = (el: Element): boolean => {
+          if ((el.textContent ?? '').trim().length > 0) return true;
+          return !!el.querySelector(
+            'img, canvas, svg, table, video, iframe, input:not([type="hidden"]), button, a[href]'
+          );
+        };
+
+        const isDecorativeDeckOverlay = (el: Element): boolean => {
+          if (el.hasAttribute(candidateAttr)) return false;
+          const style = window.getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden') return true;
+          const opacity = parseFloat(style.opacity);
+          if (!Number.isNaN(opacity) && opacity <= 0.01) return true;
+
+          const noMeaningful = !hasMeaningfulContent(el);
+          if (style.pointerEvents === 'none' && noMeaningful) return true;
+
+          const pos = style.position;
+          if (noMeaningful && (pos === 'absolute' || pos === 'fixed')) return true;
+
+          return false;
+        };
+
+        const candidates = Array.from(
+          document.querySelectorAll(`[${candidateAttr}]`)
+        );
+
+        let qualified: Element[];
+
+        if (!expandSiblingHosts) {
+          qualified = candidates.filter(qualifiesSize).sort(sortDocumentOrder);
+        } else {
+          const seenParents = new Set<Element>();
+          const parents: Element[] = [];
+          for (const candidate of candidates) {
+            const parent = candidate.parentElement;
+            if (!parent || seenParents.has(parent)) continue;
+            seenParents.add(parent);
+            parents.push(parent);
+          }
+          parents.sort(sortDocumentOrder);
+
+          qualified = [];
+          for (const parent of parents) {
+            for (const child of Array.from(parent.children)) {
+              if (!qualifiesSize(child)) continue;
+              if (isDecorativeDeckOverlay(child)) continue;
               qualified.push(child);
             }
           }
@@ -451,10 +493,11 @@ export class ElementInspector {
       {
         candidateAttr: SLIDE_CANDIDATE_ATTR,
         indexAttr: SLIDE_INDEX_ATTR,
-        ruleLabel,
+        ruleLabel: probeRule.label,
         minH,
         maxH,
         minW,
+        expandSiblingHosts,
       }
     );
   }
@@ -563,8 +606,11 @@ export class ElementInspector {
     slideSelector: string,
     discovery?: SlideContainerDiscovery
   ): Promise<void> {
+    const minH = getSlideHeightPx() * SLIDE_HEIGHT_MIN_RATIO;
+    const minW = getSlideWidthPx() * SLIDE_WIDTH_MIN_RATIO;
+
     await this.page.evaluate(
-      ({ slideSelector, hiddenAttr }) => {
+      ({ slideSelector, hiddenAttr, indexAttr, minH, minW }) => {
         const host = document.querySelector(slideSelector);
         if (!host) return;
 
@@ -574,10 +620,49 @@ export class ElementInspector {
           (node as HTMLElement).style.setProperty('display', 'none', 'important');
         };
 
+        const isSlideUiControl = (node: Element): boolean => {
+          if (!(node instanceof HTMLElement)) return false;
+          if (node.matches('input[type="radio"], input[type="checkbox"]')) return true;
+          if (node.matches('.slide-nav, .controls, .nav-dots')) return true;
+          if (node.closest('.slide-nav, .controls')) return true;
+          return false;
+        };
+
+        const hasVisibleBackground = (el: Element): boolean => {
+          const style = window.getComputedStyle(el);
+          const bg = style.backgroundImage;
+          if (bg && bg !== 'none') return true;
+          const bgColor = style.backgroundColor;
+          return !!(
+            bgColor &&
+            bgColor !== 'transparent' &&
+            bgColor !== 'rgba(0, 0, 0, 0)'
+          );
+        };
+
+        const isSharedDeckDecoration = (node: Element): boolean => {
+          if (!(node instanceof HTMLElement)) return false;
+          if (node.hasAttribute(indexAttr)) return false;
+          const hostParent = host.parentElement;
+          if (!hostParent || node.parentElement !== hostParent) return false;
+
+          const rect = node.getBoundingClientRect();
+          const fullBleed = rect.width >= minW && rect.height >= minH;
+          const partialDecor =
+            hasVisibleBackground(node) && rect.height >= minH * 0.5;
+          return fullBleed || partialDecor;
+        };
+
         const shouldKeepVisible = (node: Element): boolean => {
           if (node === host || host.contains(node)) return true;
           if (node.contains(host)) return true;
+          if (isSharedDeckDecoration(node)) return true;
           return false;
+        };
+
+        const shouldHide = (node: Element): boolean => {
+          if (isSlideUiControl(node)) return true;
+          return !shouldKeepVisible(node);
         };
 
         const roots: Element[] = [];
@@ -588,21 +673,27 @@ export class ElementInspector {
 
         for (const root of roots) {
           for (const node of Array.from(root.querySelectorAll('*'))) {
-            if (shouldKeepVisible(node)) continue;
+            if (!shouldHide(node)) continue;
             hideNode(node);
           }
         }
 
         if (document.body) {
           for (const child of Array.from(document.body.children)) {
-            if (shouldKeepVisible(child)) continue;
+            if (!shouldHide(child)) continue;
             hideNode(child);
           }
         }
 
         window.scrollTo(0, 0);
       },
-      { slideSelector, hiddenAttr: SLIDE_ISOLATION_ATTR }
+      {
+        slideSelector,
+        hiddenAttr: SLIDE_ISOLATION_ATTR,
+        indexAttr: SLIDE_INDEX_ATTR,
+        minH,
+        minW,
+      }
     );
     await this.prepareSlideContainerForInspect(slideSelector, discovery);
     await this.waitForLayoutSettle();
@@ -4860,6 +4951,15 @@ export class ElementInspector {
                 gradientCount >= 1 ||
                 /radial-gradient\(|repeating-radial-gradient\(/i.test(bgImg);
               const isNearFullSlide = info.width >= 1152 && info.height >= 648;
+              const elemOpacity =
+                typeof info.styles?.opacity === 'number' && !Number.isNaN(info.styles.opacity)
+                  ? info.styles.opacity
+                  : 1;
+              // Subtle full-slide texture overlays (e.g. opacity:0.03 paper grain) are invisible in
+              // practice and screenshot isolation composites ancestor fills into the PNG.
+              if (isNearFullSlide && !hasGrad && elemOpacity <= 0.05) {
+                return;
+              }
               if (!(isNearFullSlide && hasGrad)) {
                 const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
                 element.setAttribute('data-screenshot', screenshotId);
@@ -5118,13 +5218,14 @@ export class ElementInspector {
     // so Playwright's element screenshot cannot composite separate PPTX layers (text,
     // icons, etc.) into the PNG. Keep the host and its ancestor chain visible.
     const PPTX_SHOT_HIDDEN_ATTR = 'data-html2pptx-shot-hidden';
+    const PPTX_SHOT_ANCESTOR_BG_ATTR = 'data-html2pptx-shot-ancestor-bg';
 
     for (const el of elements as any[]) {
       if (el.needsScreenshot && el.screenshotSelector) {
         const selector = el.screenshotSelector as string;
         try {
           await this.page.evaluate(
-            ({ sel, hiddenAttr, hideSvgText }) => {
+            ({ sel, hiddenAttr, ancestorBgAttr, hideSvgText }) => {
               const host = document.querySelector(sel);
               if (!host) return;
               const hideTargets: Element[] = document.body
@@ -5156,10 +5257,24 @@ export class ElementInspector {
                 node.setAttribute(hiddenAttr, '1');
                 (node as HTMLElement).style.setProperty('display', 'none', 'important');
               });
+
+              // Low-opacity overlays must not composite ancestor fills (e.g. slide container bg)
+              // into the isolated screenshot — that produces an opaque full-slide wash in PPT.
+              let parent = host.parentElement;
+              while (parent) {
+                if (parent === document.body || parent === document.documentElement) break;
+                if (parent instanceof HTMLElement) {
+                  parent.setAttribute(ancestorBgAttr, '1');
+                  parent.style.setProperty('background-color', 'transparent', 'important');
+                  parent.style.setProperty('background-image', 'none', 'important');
+                }
+                parent = parent.parentElement;
+              }
             },
             {
               sel: selector,
               hiddenAttr: PPTX_SHOT_HIDDEN_ATTR,
+              ancestorBgAttr: PPTX_SHOT_ANCESTOR_BG_ATTR,
               hideSvgText: !!el.svgHybridRaster,
             }
           );
@@ -5214,14 +5329,26 @@ export class ElementInspector {
           await this.page.evaluate(() => {
             document.querySelector('[data-html2pptx-shot-style]')?.remove();
           });
-          await this.page.evaluate((hiddenAttr) => {
-            document.querySelectorAll(`[${hiddenAttr}]`).forEach((node) => {
-              if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
-              (node as HTMLElement).style.removeProperty('display');
-              (node as SVGElement).style.removeProperty('visibility');
-              node.removeAttribute(hiddenAttr);
-            });
-          }, PPTX_SHOT_HIDDEN_ATTR);
+          await this.page.evaluate(
+            ({ hiddenAttr, ancestorBgAttr }) => {
+              document.querySelectorAll(`[${hiddenAttr}]`).forEach((node) => {
+                if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
+                (node as HTMLElement).style.removeProperty('display');
+                (node as SVGElement).style.removeProperty('visibility');
+                node.removeAttribute(hiddenAttr);
+              });
+              document.querySelectorAll(`[${ancestorBgAttr}]`).forEach((node) => {
+                if (!(node instanceof HTMLElement)) return;
+                node.style.removeProperty('background-color');
+                node.style.removeProperty('background-image');
+                node.removeAttribute(ancestorBgAttr);
+              });
+            },
+            {
+              hiddenAttr: PPTX_SHOT_HIDDEN_ATTR,
+              ancestorBgAttr: PPTX_SHOT_ANCESTOR_BG_ATTR,
+            }
+          );
         }
       }
     }

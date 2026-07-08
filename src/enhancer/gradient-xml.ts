@@ -6,7 +6,8 @@ import { StyleEnhancement, GradientData, GradientStop } from '../types';
  * long soft blends instead of crisp edges. Also pad implicit 0%/100% endpoints
  * when the first/last CSS stop is not at the box edge.
  */
-function linearStopsForOoxml(stops: GradientStop[]): GradientStop[] {
+/** Normalize CSS gradient stops to OOXML-safe positions (0–100000, strictly increasing). */
+function normalizeStopsForOoxml(stops: GradientStop[]): GradientStop[] {
   if (stops.length === 0) return stops;
 
   type Tagged = GradientStop & { sourceOrder: number };
@@ -131,7 +132,7 @@ export function generateGradientXml(
   const { angle = 180, stops } = gradientData;
   const effectiveAngle = (angle + angleAdjustment) % 360;
 
-  const sortedStops = linearStopsForOoxml(stops);
+  const sortedStops = normalizeStopsForOoxml(stops);
 
   // Generate XML for each color stop
   const gradientStopsXml = sortedStops.map(stop => {
@@ -163,7 +164,7 @@ export function generateGradientXml(
  * Radial (path circle) fill: focal center via fillToRect (OOXML ST_Percentage 0–100000).
  */
 function generateRadialGradientXml(gradientData: GradientData, elementOpacity: number): string {
-  const sortedStops = [...gradientData.stops].sort((a, b) => a.position - b.position);
+  const sortedStops = normalizeStopsForOoxml(gradientData.stops);
   const gradientStopsXml = sortedStops.map(stop => {
     const pos = Math.round(stop.position * 1000);
     const stopAlpha = (stop.alpha ?? 1) * elementOpacity;
