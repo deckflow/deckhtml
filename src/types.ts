@@ -237,6 +237,9 @@ export interface ComputedStyles {
   borderTopStyle?: string;
   borderBottomStyle?: string;
 
+  /** Composited opaque background behind the cell (for table border color blending) */
+  effectiveBackgroundColor?: string;
+
   // Shadow properties
   boxShadow?: string;
   textShadow?: string;

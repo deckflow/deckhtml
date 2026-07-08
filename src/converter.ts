@@ -1113,7 +1113,10 @@ export class ElementConverter {
         const cellFaces = this.resolveScriptFontFaces(cellStyles, primaryScript);
         if (cellFaces !== undefined) cellOptions.fontFace = cellFaces.latin;
         const cellFill = getFillOptions(cellStyles);
-        const cellBorder = getTableCellBorderOptions(cellStyles);
+        const cellBorder = getTableCellBorderOptions(
+          cellStyles,
+          cellStyles.effectiveBackgroundColor
+        );
 
         const options: any = {
           ...cellOptions,

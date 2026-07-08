@@ -3299,6 +3299,49 @@ export class ElementInspector {
         }
 
         /**
+         * Composited opaque background behind a cell (html → … → cell), for border-color blending.
+         */
+        function resolveEffectiveBackgroundColor(el: Element): string {
+          const chain: Element[] = [];
+          let node: Element | null = el;
+          while (node) {
+            chain.unshift(node);
+            node = node.parentElement;
+          }
+
+          let r: number | null = null;
+          let g: number | null = null;
+          let b: number | null = null;
+
+          for (const n of chain) {
+            const bg = window.getComputedStyle(n).backgroundColor;
+            const match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+            if (!match) continue;
+            const pr = Number(match[1]);
+            const pg = Number(match[2]);
+            const pb = Number(match[3]);
+            const pa = match[4] !== undefined ? Number(match[4]) : 1;
+            if (pa <= 0) continue;
+
+            if (r === null) {
+              r = pr;
+              g = pg;
+              b = pb;
+            } else {
+              const inv = 1 - pa;
+              r = pr * pa + (r as number) * inv;
+              g = pg * pa + (g as number) * inv;
+              b = pb * pa + (b as number) * inv;
+            }
+          }
+
+          if (r === null || g === null || b === null) {
+            return 'rgb(255, 255, 255)';
+          }
+          return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        }
+
+        /**
          * Extract table data including column widths and row heights from rendered layout
          */
         function extractTableData(table: HTMLTableElement): any {
@@ -3356,6 +3399,7 @@ export class ElementInspector {
                     borderRightStyle: style.borderRightStyle,
                     borderBottomStyle: style.borderBottomStyle,
                     borderLeftStyle: style.borderLeftStyle,
+                    effectiveBackgroundColor: resolveEffectiveBackgroundColor(cell),
                   },
                 });
               }
@@ -4649,9 +4693,12 @@ export class ElementInspector {
 
             if (firstTextNode && lastTextNode) {
               const style = window.getComputedStyle(element);
+              const bgClipForFill = (style as any).webkitBackgroundClip || style.backgroundClip;
+              const bgImageIsTextGradient =
+                bgClipForFill === 'text' && style.backgroundImage !== 'none';
               const hasFill =
                 (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent') ||
-                style.backgroundImage !== 'none';
+                (style.backgroundImage !== 'none' && !bgImageIsTextGradient);
               const hasBorder =
                 (parseFloat(style.borderLeftWidth) > 0 && style.borderLeftColor !== 'transparent') ||
                 (parseFloat(style.borderRightWidth) > 0 && style.borderRightColor !== 'transparent') ||
@@ -4991,8 +5038,13 @@ export class ElementInspector {
           // Bordered/filled flex (or block) box with excluded SVG/img/canvas/icon: frame shape + Range-sized caption text
           if (emitSplitCaptionFrameShape && element instanceof HTMLElement) {
             const stripCaptionOnlyBoxStyles = (st: any) => {
+              const captionBgClip = st.webkitBackgroundClip ?? st.backgroundClip;
+              const captionTextGradient =
+                captionBgClip === 'text' && st.backgroundImage && st.backgroundImage !== 'none';
               st.backgroundColor = 'rgba(0, 0, 0, 0)';
-              st.backgroundImage = 'none';
+              if (!captionTextGradient) {
+                st.backgroundImage = 'none';
+              }
               st.boxShadow = 'none';
               st.borderWidth = '0px';
               st.borderStyle = 'none';

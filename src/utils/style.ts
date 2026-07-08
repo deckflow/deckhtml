@@ -898,13 +898,18 @@ export function getTextOptions(
 
   const textStroke = parseWebkitTextStroke(styles);
 
-  let colorResult = parseColor(styles.color) ?? parseColor(styles.webkitTextFillColor);
-
-  if (!colorResult && isTextClip) {
-    const gradientResult = parseGradientSolidApproximation(styles.backgroundImage);
-    if (gradientResult) {
-      colorResult = { color: gradientResult.color };
+  let colorResult: ReturnType<typeof parseColor>;
+  if (isTextClip) {
+    // Gradient/solid text via background-clip:text — inherited `color` is irrelevant; webkit fill may be transparent.
+    const fillColor = parseColor(styles.webkitTextFillColor);
+    if (fillColor && fillColor.alpha !== 0) {
+      colorResult = fillColor;
+    } else {
+      const gradientResult = parseGradientSolidApproximation(styles.backgroundImage);
+      colorResult = gradientResult ? { color: gradientResult.color } : undefined;
     }
+  } else {
+    colorResult = parseColor(styles.color) ?? parseColor(styles.webkitTextFillColor);
   }
 
   if (textStroke) {
@@ -1783,25 +1788,40 @@ export function getLineOptions(styles: ComputedStyles): any {
 
 /**
  * Get table cell border options for pptxgenjs
- * Returns border: [top, right, bottom, left] - each side is {pt, color, transparency?} or null
- * pptxgenjs uses pt for border thickness; 1px CSS ≈ 0.75pt
- * Handles rgba alpha → PowerPoint transparency
+ * Returns border: [top, right, bottom, left] - each side is {type, pt, color} or null
+ * pptxgenjs table borders do not support transparency; semi-transparent CSS borders are
+ * composited onto the cell's effective background (from inspector).
  */
-export function getTableCellBorderOptions(styles: any): any[] | undefined {
+export function getTableCellBorderOptions(
+  styles: any,
+  effectiveBackgroundColor?: string
+): any[] | undefined {
+  const backdrop = resolveBackdropRgb(effectiveBackgroundColor);
+
   const parseSide = (width: string | undefined, color: string | undefined) => {
     const px = parseFloat(String(width || '0')) || 0;
     if (px <= 0) return null;
     const colorResult = parseColor(color);
     if (!colorResult) return null;
-    const pt = Math.max(0.5, px * 0.75);
-    const side: { pt: number; color: string; transparency?: number } = {
-      pt,
-      color: colorResult.color,
-    };
+
+    let borderColor = colorResult.color;
     if (colorResult.alpha !== undefined && colorResult.alpha < 1) {
-      side.transparency = Math.round((1 - colorResult.alpha) * 100);
+      const r = parseInt(colorResult.color.slice(0, 2), 16);
+      const g = parseInt(colorResult.color.slice(2, 4), 16);
+      const b = parseInt(colorResult.color.slice(4, 6), 16);
+      borderColor = blendRgbaOnBackground(
+        r,
+        g,
+        b,
+        colorResult.alpha,
+        backdrop.r,
+        backdrop.g,
+        backdrop.b
+      );
     }
-    return side;
+
+    const pt = parseBorderWidth(String(px));
+    return { type: 'solid' as const, pt, color: borderColor };
   };
 
   const top = parseSide(styles.borderTopWidth, styles.borderTopColor);
