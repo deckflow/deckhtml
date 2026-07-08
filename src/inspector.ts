@@ -769,14 +769,19 @@ export class ElementInspector {
 
   private async restoreSlideIsolation(): Promise<void> {
     await this.page.evaluate(
-      (hiddenAttr) => {
+      ({ hiddenAttr, pageBgAttr }) => {
         document.querySelectorAll(`[${hiddenAttr}]`).forEach((node) => {
           if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
           (node as HTMLElement).style.removeProperty('display');
           node.removeAttribute(hiddenAttr);
         });
+        // Raster page-bg helpers are appended to <body> during inspect and must not
+        // leak into the next slide on the same Playwright page (multi-file batch path).
+        document.querySelectorAll(`[${pageBgAttr}]`).forEach((node) => {
+          node.remove();
+        });
       },
-      SLIDE_ISOLATION_ATTR
+      { hiddenAttr: SLIDE_ISOLATION_ATTR, pageBgAttr: 'data-html2pptx-page-bg' }
     );
   }
 
@@ -5117,8 +5122,13 @@ export class ElementInspector {
               (bs.backgroundImage && bs.backgroundImage !== 'none');
             if (!hasBg) return false;
 
+            document.querySelectorAll('[data-html2pptx-page-bg]').forEach((node) => {
+              node.remove();
+            });
+
+            const bgId = '0';
             const bgHost = document.createElement('div');
-            bgHost.setAttribute('data-html2pptx-page-bg', '1');
+            bgHost.setAttribute('data-html2pptx-page-bg', bgId);
             bgHost.style.cssText = [
               'position:fixed',
               'left:0',
@@ -5146,7 +5156,7 @@ export class ElementInspector {
               height: window.innerHeight,
               styles: getComputedStyles(bgHost),
               needsScreenshot: true,
-              screenshotSelector: `[data-html2pptx-page-bg="1"]`,
+              screenshotSelector: `[data-html2pptx-page-bg="${bgId}"]`,
               screenshotBakesOpacity: true,
             });
             // Do not emit this helper node again during normal traversal.
@@ -5329,6 +5339,11 @@ export class ElementInspector {
           await this.page.evaluate(() => {
             document.querySelector('[data-html2pptx-shot-style]')?.remove();
           });
+          if (selector.includes('data-html2pptx-page-bg')) {
+            await this.page.evaluate((sel) => {
+              document.querySelector(sel)?.remove();
+            }, selector);
+          }
           await this.page.evaluate(
             ({ hiddenAttr, ancestorBgAttr }) => {
               document.querySelectorAll(`[${hiddenAttr}]`).forEach((node) => {
