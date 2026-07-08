@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { DeckTask } from '../types/sdk';
+import type { ConversionStats } from '../../conversion-report';
 
 type OutputFile = {
   url: string;
@@ -166,6 +167,7 @@ export interface ConversionResultEnvelope {
   format: string;
   mode: string;
   slideCount?: number;
+  stats?: ConversionStats;
   report?: string;
 }
 

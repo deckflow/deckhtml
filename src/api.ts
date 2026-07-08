@@ -29,6 +29,7 @@ import {
 } from './utils/textScript';
 import { buildPlatformFontContext, PlatformFontContext } from './utils/platformFontMap';
 import { runQuietly } from './utils/quiet';
+import { buildElementStats, buildFontStats } from './conversion-report';
 
 /**
  * Read SVG viewBox / width+height for viewport auto-sizing.
@@ -409,6 +410,10 @@ export async function convertHtmlToPptx(
     data,
     usedFonts: usedFontsDeduped,
     slideCount,
+    stats: {
+      elements: buildElementStats(mergedSlidesMap),
+      fonts: buildFontStats(usedFontsMap),
+    },
   };
   });
 }

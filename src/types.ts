@@ -3,6 +3,7 @@
  */
 
 import type { PlatformFontLang, PlatformTarget } from './utils/platformFontMap';
+import type { ConversionStats } from './conversion-report';
 
 export interface ConversionOptions {
   /** Single HTML/SVG input file */
@@ -306,6 +307,8 @@ export interface ConversionResult {
   slideCount?: number;
   /** Resolved font names (with Bold/Italic suffix only when exactly matched in registry) */
   usedFonts?: string[];
+  /** Element and font statistics collected during conversion */
+  stats?: ConversionStats;
 }
 
 // Style enhancement types

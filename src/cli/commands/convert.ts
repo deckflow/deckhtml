@@ -20,6 +20,10 @@ import {
   writeTaskOutput,
   type ConversionResultEnvelope,
 } from '../utils/output';
+import {
+  buildConversionReport,
+  EMPTY_CONVERSION_STATS,
+} from '../../conversion-report';
 import { resolveMode, validateCloudOnlyFlags } from '../utils/mode';
 import { resolveViewport } from '../utils/size';
 
@@ -151,6 +155,7 @@ async function runLocalConvert(
     format,
     mode: 'local',
     slideCount: result.slideCount,
+    stats: result.stats,
   };
 }
 
@@ -318,6 +323,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
           const localViewport = resolveViewport(options.width, true)!;
           const cloudViewport = resolveViewport(options.width, false);
 
+          const startedAt = Date.now();
           let envelope: ConversionResultEnvelope;
           if (mode === 'cloud') {
             envelope = await runCloudConvert(
@@ -342,7 +348,22 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
 
           if (options.report) {
             const reportPath = `${outputPath}.report.json`;
-            writeFileSync(reportPath, `${JSON.stringify(envelope, null, 2)}\n`);
+            const report = buildConversionReport({
+              input: paths,
+              output: outputPath,
+              format,
+              mode: envelope.mode,
+              slideCount: envelope.slideCount ?? 0,
+              stats: envelope.stats ?? EMPTY_CONVERSION_STATS,
+              platform,
+              ...(mode === 'local'
+                ? { viewport: localViewport }
+                : cloudViewport
+                  ? { viewport: cloudViewport }
+                  : {}),
+              durationMs: Date.now() - startedAt,
+            });
+            writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
             envelope.report = reportPath;
           }
 

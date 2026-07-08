@@ -6,6 +6,18 @@
 export { convertHtmlToPptx } from './api';
 export * from './types';
 export {
+  buildConversionReport,
+  buildElementStats,
+  buildFontStats,
+  EMPTY_CONVERSION_STATS,
+  type ConversionReport,
+  type ConversionStats,
+  type ConversionElementStats,
+  type ConversionFontStats,
+  type ElementTypeCounts,
+  type SlideElementStats,
+} from './conversion-report';
+export {
   isChineseFont,
   matchChineseFontAlias,
   splitFontStack,
