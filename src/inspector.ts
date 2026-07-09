@@ -942,13 +942,69 @@ export class ElementInspector {
           return effective;
         }
 
+        /** Bake explicit pixel width/height so embedded SVG is not sized from width="100%". */
+        function bakeSvgCloneDimensions(
+          clone: SVGElement,
+          original: SVGElement,
+          rect: DOMRect
+        ): void {
+          const svgRoot = original as SVGSVGElement;
+          const vb = svgRoot.viewBox?.baseVal;
+          if (vb && vb.width > 0 && vb.height > 0) {
+            clone.setAttribute(
+              'viewBox',
+              `${vb.x} ${vb.y} ${vb.width} ${vb.height}`
+            );
+            clone.setAttribute('width', String(vb.width));
+            clone.setAttribute('height', String(vb.height));
+          } else {
+            const w = parseFloat(original.getAttribute('width') || '') || rect.width;
+            const h = parseFloat(original.getAttribute('height') || '') || rect.height;
+            if (w > 0 && h > 0) {
+              clone.setAttribute('width', String(w));
+              clone.setAttribute('height', String(h));
+            }
+          }
+          clone.removeAttribute('style');
+        }
+
         /** Serialize SVG as inline SVG image (data URL). */
         function emitSvgAsImage(svgEl: SVGElement, rect: DOMRect): void {
           try {
+            const isStandaloneRoot = inputIsSvg && svgEl === getStandaloneSvgRoot();
+            const styles = getComputedStyles(svgEl);
+            // Opacity is baked into serialized SVG / PNG — avoid double-fading in convertImageElement.
+            styles.opacity = 1;
+            const layout = {
+              x: isStandaloneRoot ? 0 : rect.left,
+              y: isStandaloneRoot ? 0 : rect.top,
+              width: isStandaloneRoot ? window.innerWidth : rect.width,
+              height: isStandaloneRoot ? window.innerHeight : rect.height,
+            };
+
+            // Mermaid and similar libs render labels in <foreignObject> HTML. PowerPoint's SVG
+            // engine does not faithfully render foreignObject (often clips top labels) and
+            // width="100%" collapses intrinsic size — rasterize via Playwright instead.
+            if (svgEl.querySelector('foreignObject')) {
+              const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
+              svgEl.setAttribute('data-screenshot', screenshotId);
+              result.push({
+                type: 'image',
+                tag: 'svg',
+                ...layout,
+                styles,
+                needsScreenshot: true,
+                screenshotSelector: `[data-screenshot="${screenshotId}"]`,
+              });
+              markDomAsPptxMapped(svgEl, true);
+              return;
+            }
+
             const clone = svgEl.cloneNode(true) as SVGElement;
             if (!clone.getAttribute('xmlns')) {
               clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
             }
+            bakeSvgCloneDimensions(clone, svgEl, rect);
             // Clone loses page CSS — bake currentColor / var() / inherited stroke into attributes.
             const computedColor = window.getComputedStyle(svgEl).color;
             const fallbackColorHex = cssColorToHex(computedColor) || '000000';
@@ -961,17 +1017,10 @@ export class ElementInspector {
             }
             const svgString = new XMLSerializer().serializeToString(clone);
             const encoded = btoa(unescape(encodeURIComponent(svgString)));
-            const isStandaloneRoot = inputIsSvg && svgEl === getStandaloneSvgRoot();
-            const styles = getComputedStyles(svgEl);
-            // Opacity is baked into the serialized SVG — avoid double-fading in convertImageElement.
-            styles.opacity = 1;
             result.push({
               type: 'image',
               tag: 'svg',
-              x: isStandaloneRoot ? 0 : rect.left,
-              y: isStandaloneRoot ? 0 : rect.top,
-              width: isStandaloneRoot ? window.innerWidth : rect.width,
-              height: isStandaloneRoot ? window.innerHeight : rect.height,
+              ...layout,
               styles,
               src: `data:image/svg+xml;base64,${encoded}`,
             });
