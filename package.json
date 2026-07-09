@@ -23,6 +23,14 @@
     "converter",
     "deckhtml"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deckflow/deckhtml.git"
+  },
+  "bugs": {
+    "url": "https://github.com/deckflow/deckhtml/issues"
+  },
+  "homepage": "https://github.com/deckflow/deckhtml#readme",
   "license": "MIT",
   "dependencies": {
     "@deckops/sdk": "^0.7.0",
