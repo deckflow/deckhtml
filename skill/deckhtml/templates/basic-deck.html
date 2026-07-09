@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeckHTML Basic Deck Template</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --slide: #f8fafc;
+      --ink: #0f172a;
+      --muted: #475569;
+      --accent: #0e7490;
+      --accent-soft: #ecfeff;
+      --line: #e2e8f0;
+      --card: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+    }
+
+    /* DeckHTML auto-detects .slide-container (≥2 hosts, ~viewport size) */
+    .slide-container {
+      width: 1280px;
+      height: 720px;
+      position: relative;
+      overflow: hidden;
+      background: var(--slide);
+      margin: 0 auto 24px;
+    }
+
+    .pad {
+      position: absolute;
+      inset: 56px 64px;
+    }
+
+    .eyebrow {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 64px;
+      line-height: 1.15;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      margin: 0 0 28px;
+      font-size: 40px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    p, li {
+      font-size: 24px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .lead {
+      margin-top: 28px;
+      max-width: 720px;
+      font-size: 26px;
+    }
+
+    .footer {
+      position: absolute;
+      left: 64px;
+      right: 64px;
+      bottom: 36px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      color: #94a3b8;
+    }
+
+    .title-slide {
+      background:
+        linear-gradient(135deg, #ecfeff 0%, #f8fafc 42%, #f1f5f9 100%);
+    }
+
+    .title-slide .accent-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 12px;
+      background: var(--accent);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      margin-top: 8px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 28px 30px;
+      min-height: 280px;
+    }
+
+    .card h3 {
+      margin: 0 0 14px;
+      font-size: 26px;
+      color: var(--ink);
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .card .tag {
+      display: inline-block;
+      margin-bottom: 14px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 28px;
+    }
+
+    li { margin: 0 0 12px; }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 12px;
+    }
+
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 32px 28px;
+      text-align: left;
+    }
+
+    .kpi .num {
+      font-size: 52px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .kpi .label {
+      font-size: 20px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .closing {
+      background: #082f49;
+      color: #f8fafc;
+    }
+
+    .closing h1,
+    .closing .eyebrow,
+    .closing .lead,
+    .closing .footer {
+      color: #f8fafc;
+    }
+
+    .closing .eyebrow { color: #67e8f9; }
+    .closing .lead { color: #cbd5e1; }
+    .closing .footer { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <!-- Slide 1: Title -->
+  <section class="slide-container title-slide">
+    <div class="accent-bar"></div>
+    <div class="pad">
+      <p class="eyebrow">DeckHTML Template</p>
+      <h1>从零生成完整<br />HTML Deck</h1>
+      <p class="lead">
+        固定 1280×720 视口，使用 <code>.slide-container</code> 作为多页宿主。
+        复制本文件后替换文案与版式即可转换 PPTX。
+      </p>
+    </div>
+    <div class="footer">
+      <span>skill/deckhtml/templates/basic-deck.html</span>
+      <span>1 / 4</span>
+    </div>
+  </section>
+
+  <!-- Slide 2: Agenda / bullets -->
+  <section class="slide-container">
+    <div class="pad">
+      <p class="eyebrow">Overview</p>
+      <h2>本模板包含什么</h2>
+      <ul>
+        <li>可被 DeckHTML 自动探测的多页结构（≥2 个 slide host）</li>
+        <li>标题页、双栏卡片、指标页、收尾页四种常见版式</li>
+        <li>真实 DOM 文本与色块（优先可编辑 PPTX，而非整页截图）</li>
+        <li>与默认视口一致的尺寸，避免裁切与漏检</li>
+      </ul>
+    </div>
+    <div class="footer">
+      <span>Author → convert → verify</span>
+      <span>2 / 4</span>
+    </div>
+  </section>
+
+  <!-- Slide 3: Two-column cards -->
+  <section class="slide-container">
+    <div class="pad">
+      <p class="eyebrow">Layout</p>
+      <h2>双栏内容示例</h2>
+      <div class="grid-2">
+        <div class="card">
+          <span class="tag">Do</span>
+          <h3>推荐写法</h3>
+          <p>每页一个 <code>.slide-container</code>，内容放在页内；字体用系统栈或已加载的 web font；关键状态写在 DOM 里。</p>
+        </div>
+        <div class="card">
+          <span class="tag">Don't</span>
+          <h3>避免</h3>
+          <p>依赖 hover 才显示的内容；过小的“幻灯片”盒子；把正文只放在页外导航或 fixed 层。</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Prefer DOM text &amp; shapes</span>
+      <span>3 / 4</span>
+    </div>
+  </section>
+
+  <!-- Slide 4: KPIs + closing cue (metrics) -->
+  <section class="slide-container">
+    <div class="pad">
+      <p class="eyebrow">Metrics</p>
+      <h2>关键数字</h2>
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="num">1280</div>
+          <p class="label">默认视口宽度 (px)</p>
+        </div>
+        <div class="kpi">
+          <div class="num">720</div>
+          <p class="label">默认视口高度 (px)</p>
+        </div>
+        <div class="kpi">
+          <div class="num">4</div>
+          <p class="label">本模板页数</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>npx @deckflow/deckhtml@latest basic-deck.html -o deck.pptx --mode local</span>
+      <span>4 / 4</span>
+    </div>
+  </section>
+</body>
+</html>
