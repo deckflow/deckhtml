@@ -14,7 +14,13 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist/"
+    "clean": "rm -rf dist/",
+    "link:dev": "npm run build && npm link",
+    "unlink:dev": "npm unlink -g @deckflow/deckhtml",
+    "global:install": "npm run build && npm install -g .",
+    "global:uninstall": "npm uninstall -g @deckflow/deckhtml",
+    "pack:global": "npm run build && npm pack && npm install -g ./deckflow-deckhtml-*.tgz",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "html",
