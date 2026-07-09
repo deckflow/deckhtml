@@ -9,13 +9,17 @@ export {
   buildConversionReport,
   buildElementStats,
   buildFontStats,
+  buildSimplifiedStats,
   EMPTY_CONVERSION_STATS,
   type ConversionReport,
   type ConversionStats,
   type ConversionElementStats,
   type ConversionFontStats,
+  type ConversionSimplifiedStats,
   type ElementTypeCounts,
+  type SimplifiedElementEntry,
   type SlideElementStats,
+  type SlideSimplifiedStats,
 } from './conversion-report';
 export {
   isChineseFont,

@@ -107,7 +107,26 @@ export interface ElementInfo {
   ommlXml?: string;
   /** Plain text for mc:Fallback when embedding OMML in PPT */
   mathFallbackText?: string;
+  /** How this element was rasterized instead of native PPTX conversion */
+  rasterMethod?: RasterMethod;
+  /** Why native conversion was skipped (e.g. chart-canvas, svg-flowchart) */
+  rasterReason?: RasterReason;
 }
+
+/** Rasterization method used when native PPTX conversion is skipped */
+export type RasterMethod = 'canvas-export' | 'svg-serialize' | 'screenshot';
+
+/** Reason an element was rasterized (for conversion report) */
+export type RasterReason =
+  | 'chart-canvas'
+  | 'svg-diagram'
+  | 'svg-flowchart'
+  | 'gradient-layered'
+  | 'gradient-tiled-radial'
+  | 'gradient-hard-stop'
+  | 'background-url'
+  | 'page-background'
+  | 'math-fallback';
 
 /** SVG path command in OOXML path space 0–21600 */
 export type SvgPathCommandNormalized =

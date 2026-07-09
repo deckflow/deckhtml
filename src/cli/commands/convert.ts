@@ -14,8 +14,10 @@ import {
   resolveInputs,
 } from '../utils/input';
 import {
+  attachSimplifiedToEnvelope,
   logProgress,
   logVerbose,
+  printSimplifiedNotice,
   printSuccess,
   writeTaskOutput,
   type ConversionResultEnvelope,
@@ -367,6 +369,13 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
             envelope.report = reportPath;
           }
 
+          envelope = attachSimplifiedToEnvelope(envelope);
+          printSimplifiedNotice(
+            envelope.simplified,
+            envelope.mode,
+            ctx.quiet,
+            ctx.jsonOutput
+          );
           printSuccess(envelope, ctx.jsonOutput);
           process.exit(0);
         } finally {

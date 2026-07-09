@@ -942,6 +942,16 @@ export class ElementInspector {
           return effective;
         }
 
+        /** Mark element for isolated Playwright screenshot fallback (complex CSS / SVG). */
+        function assignScreenshotFallback(host: Element, info: any, reason: string): void {
+          const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
+          host.setAttribute('data-screenshot', screenshotId);
+          info.needsScreenshot = true;
+          info.screenshotSelector = `[data-screenshot="${screenshotId}"]`;
+          info.rasterMethod = 'screenshot';
+          info.rasterReason = reason;
+        }
+
         /** Bake explicit pixel width/height so embedded SVG is not sized from width="100%". */
         function bakeSvgCloneDimensions(
           clone: SVGElement,
@@ -986,16 +996,14 @@ export class ElementInspector {
             // engine does not faithfully render foreignObject (often clips top labels) and
             // width="100%" collapses intrinsic size — rasterize via Playwright instead.
             if (svgEl.querySelector('foreignObject')) {
-              const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
-              svgEl.setAttribute('data-screenshot', screenshotId);
-              result.push({
+              const info: any = {
                 type: 'image',
                 tag: 'svg',
                 ...layout,
                 styles,
-                needsScreenshot: true,
-                screenshotSelector: `[data-screenshot="${screenshotId}"]`,
-              });
+              };
+              assignScreenshotFallback(svgEl, info, 'svg-flowchart');
+              result.push(info);
               markDomAsPptxMapped(svgEl, true);
               return;
             }
@@ -1023,6 +1031,8 @@ export class ElementInspector {
               ...layout,
               styles,
               src: `data:image/svg+xml;base64,${encoded}`,
+              rasterMethod: 'svg-serialize',
+              rasterReason: 'svg-diagram',
             });
             markDomAsPptxMapped(svgEl);
           } catch (e) {
@@ -5007,6 +5017,8 @@ export class ElementInspector {
           } else if (type === 'canvas') {
             try {
               info.dataUrl = (element as HTMLCanvasElement).toDataURL('image/png');
+              info.rasterMethod = 'canvas-export';
+              info.rasterReason = 'chart-canvas';
             } catch (e) {
               console.warn('Failed to export canvas:', e);
               info.resourceUnavailable = true;
@@ -5027,24 +5039,15 @@ export class ElementInspector {
             // erase page-level background fills when the target itself is <body>.
             const isBody = (element as HTMLElement).tagName?.toLowerCase() === 'body';
             if (!isBody && gradientCount >= 2 && !isDefaultSize) {
-              const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
-              element.setAttribute('data-screenshot', screenshotId);
-              info.needsScreenshot = true;
-              info.screenshotSelector = `[data-screenshot="${screenshotId}"]`;
+              assignScreenshotFallback(element, info, 'gradient-layered');
             } else if (!isBody && hasTiledRadialGradientBackground(bgImg, bgSize)) {
-              const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
-              element.setAttribute('data-screenshot', screenshotId);
-              info.needsScreenshot = true;
-              info.screenshotSelector = `[data-screenshot="${screenshotId}"]`;
+              assignScreenshotFallback(element, info, 'gradient-tiled-radial');
             } else if (
               !isBody &&
               (gradientCount >= 1 || /radial-gradient\(|repeating-radial-gradient\(/i.test(bgImg)) &&
               hasAdjacentDuplicatePercentHardStopInGradients(bgImg)
             ) {
-              const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
-              element.setAttribute('data-screenshot', screenshotId);
-              info.needsScreenshot = true;
-              info.screenshotSelector = `[data-screenshot="${screenshotId}"]`;
+              assignScreenshotFallback(element, info, 'gradient-hard-stop');
             } else if (!isBody && /url\s*\(/i.test(bgImg)) {
               // background-image: url() — pptx shapes only support solid/gradient fills, not photos.
               // Full-slide url+gradient overlays are handled in converter; skip screenshot there.
@@ -5062,10 +5065,7 @@ export class ElementInspector {
                 return;
               }
               if (!(isNearFullSlide && hasGrad)) {
-                const screenshotId = `screenshot-${Math.random().toString(36).slice(2, 10)}`;
-                element.setAttribute('data-screenshot', screenshotId);
-                info.needsScreenshot = true;
-                info.screenshotSelector = `[data-screenshot="${screenshotId}"]`;
+                assignScreenshotFallback(element, info, 'background-url');
               }
             }
           }
@@ -5259,6 +5259,8 @@ export class ElementInspector {
               needsScreenshot: true,
               screenshotSelector: `[data-html2pptx-page-bg="${bgId}"]`,
               screenshotBakesOpacity: true,
+              rasterMethod: 'screenshot',
+              rasterReason: 'page-background',
             });
             // Do not emit this helper node again during normal traversal.
             markDomAsPptxMapped(bgHost);
@@ -5320,6 +5322,8 @@ export class ElementInspector {
       if (!converted.ok) {
         console.warn(`MathML→OMML failed, using screenshot fallback: ${converted.error}`);
         el.needsScreenshot = true;
+        el.rasterMethod = 'screenshot';
+        el.rasterReason = 'math-fallback';
         continue;
       }
       el.ommlXml = converted.omml;

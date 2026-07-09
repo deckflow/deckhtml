@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { DeckTask } from '../types/sdk';
-import type { ConversionStats } from '../../conversion-report';
+import type { ConversionSimplifiedStats, ConversionStats } from '../../conversion-report';
 
 type OutputFile = {
   url: string;
@@ -168,7 +168,57 @@ export interface ConversionResultEnvelope {
   mode: string;
   slideCount?: number;
   stats?: ConversionStats;
+  simplified?: ConversionSimplifiedStats;
   report?: string;
+}
+
+const SIMPLIFIED_REASON_LABELS: Record<string, string> = {
+  'chart-canvas': 'canvas chart',
+  'svg-diagram': 'SVG diagram',
+  'svg-flowchart': 'SVG flowchart (Mermaid, etc.)',
+  'gradient-layered': 'layered gradient background',
+  'gradient-tiled-radial': 'tiled radial gradient',
+  'gradient-hard-stop': 'hard-stop gradient',
+  'background-url': 'background-image url()',
+  'page-background': 'page background',
+  'math-fallback': 'math formula (OMML fallback)',
+};
+
+export function attachSimplifiedToEnvelope(
+  envelope: ConversionResultEnvelope
+): ConversionResultEnvelope {
+  const simplified = envelope.stats?.simplified ?? envelope.simplified;
+  if (!simplified) return envelope;
+  return { ...envelope, simplified };
+}
+
+function logCloudSimplifiedTip(): void {
+  console.error(
+    'Tip: Use --mode cloud --rebuild-chart --rebuild-svg for editable charts and SVG instead of rasterized images.'
+  );
+}
+
+export function printSimplifiedNotice(
+  simplified: ConversionSimplifiedStats | undefined,
+  mode: string,
+  quiet: boolean,
+  jsonOutput: boolean
+): void {
+  if (quiet || !simplified || simplified.total === 0) return;
+
+  if (!jsonOutput) {
+    console.error(`Rasterized ${simplified.total} element(s) (simplified conversion):`);
+    for (const [reason, count] of Object.entries(simplified.byReason).sort()) {
+      const label = SIMPLIFIED_REASON_LABELS[reason] ?? reason;
+      console.error(`  ${label}: ${count}`);
+    }
+    console.error('');
+  }
+
+  if (mode === 'local') {
+    logCloudSimplifiedTip();
+    if (!jsonOutput) console.error('');
+  }
 }
 
 export function printSuccess(
