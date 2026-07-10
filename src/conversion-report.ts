@@ -1,4 +1,8 @@
 import type { ElementInfo, RasterMethod, RasterReason, UsedFontDescriptor } from './types';
+import { probeEmbeddableFonts, type FontEmbedProbeResult } from './utils/embedFonts';
+
+export type { FontEmbedMatch, FontEmbedProbeResult } from './utils/embedFonts';
+export { probeEmbeddableFonts, matchEmbeddableFont } from './utils/embedFonts';
 
 export type ElementTypeCounts = Record<string, number>;
 
@@ -17,6 +21,8 @@ export interface ConversionElementStats {
 export interface ConversionFontStats {
   families: string[];
   variants: UsedFontDescriptor[];
+  /** Probe result against the cloud embed font library (../../fonts/fonts-index.json) */
+  embed?: FontEmbedProbeResult;
 }
 
 export interface SimplifiedElementEntry {
@@ -155,7 +161,8 @@ export function buildFontStats(
     return Number(Boolean(b.italic)) - Number(Boolean(a.italic));
   });
   const families = [...new Set(variants.map((d) => d.fontFamily))].sort();
-  return { families, variants };
+  const embed = probeEmbeddableFonts(families);
+  return { families, variants, embed };
 }
 
 export function buildConversionReport(params: {

@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { DeckTask } from '../types/sdk';
-import type { ConversionSimplifiedStats, ConversionStats } from '../../conversion-report';
+import type { ConversionSimplifiedStats, ConversionStats, ConversionFontStats } from '../../conversion-report';
 
 type OutputFile = {
   url: string;
@@ -218,6 +218,46 @@ export function printSimplifiedNotice(
   if (mode === 'local') {
     logCloudSimplifiedTip();
     if (!jsonOutput) console.error('');
+  }
+}
+
+export function printFontEmbedNotice(
+  fonts: ConversionFontStats | undefined,
+  mode: string,
+  embedFonts: boolean,
+  quiet: boolean,
+  jsonOutput: boolean
+): void {
+  if (quiet || jsonOutput || !fonts?.embed) return;
+
+  const { matched, unmatched, indexMeta } = fonts.embed;
+  if (matched.length === 0 && unmatched.length === 0) return;
+
+  console.error(
+    `Cloud embed font library (${indexMeta.familyCount} families from fonts-index.json):`
+  );
+  for (const item of matched) {
+    const note =
+      item.used === item.matchedFamily
+        ? 'matched'
+        : `matched → ${item.matchedFamily}`;
+    console.error(`  ✓ ${item.used} (${note})`);
+  }
+  for (const name of unmatched) {
+    console.error(`  ✗ ${name} (not in library)`);
+  }
+  console.error('');
+
+  if (mode === 'cloud' && embedFonts && matched.length > 0) {
+    console.error(
+      'Matched fonts will be embedded into the PPTX so anyone opening the file sees the same typography.'
+    );
+    console.error('');
+  } else if (matched.length > 0) {
+    console.error(
+      'Tip: use --mode cloud --embed-fonts to embed matched fonts into the PPTX so anyone opening the file sees the same typography.'
+    );
+    console.error('');
   }
 }
 

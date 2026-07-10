@@ -3,7 +3,7 @@
  * Re-exports API for programmatic use
  */
 
-export { convertHtmlToPptx } from './api';
+export { convertHtmlToPptx, inspectHtmlFonts } from './api';
 export * from './types';
 export {
   buildConversionReport,
@@ -17,10 +17,17 @@ export {
   type ConversionFontStats,
   type ConversionSimplifiedStats,
   type ElementTypeCounts,
+  type FontEmbedMatch,
+  type FontEmbedProbeResult,
   type SimplifiedElementEntry,
   type SlideElementStats,
   type SlideSimplifiedStats,
 } from './conversion-report';
+export {
+  probeEmbeddableFonts,
+  matchEmbeddableFont,
+  EMBED_FONT_INDEX_META,
+} from './utils/embedFonts';
 export {
   isChineseFont,
   matchChineseFontAlias,

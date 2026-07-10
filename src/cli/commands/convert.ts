@@ -2,7 +2,7 @@ import type { DeckTask } from '../types/sdk';
 import { Command } from 'commander';
 import { writeFileSync } from 'fs';
 import path from 'path';
-import { convertHtmlToPptx } from '../../api';
+import { convertHtmlToPptx, inspectHtmlFonts } from '../../api';
 import {
   detectCurrentPlatformTarget,
   type PlatformTarget,
@@ -17,6 +17,7 @@ import {
   attachSimplifiedToEnvelope,
   logProgress,
   logVerbose,
+  printFontEmbedNotice,
   printSimplifiedNotice,
   printSuccess,
   writeTaskOutput,
@@ -237,12 +238,24 @@ async function runCloudConvert(
       ? writeResult.path
       : writeResult.path;
 
+  logProgress(ctx.quiet, 'Probing fonts used in HTML...');
+  const inspect = await inspectHtmlFonts({
+    inputs: inputPaths,
+    viewportWidth: viewport?.width,
+    viewportHeight: viewport?.height,
+    allowLocalResources: true,
+    quiet: true,
+    platform,
+  });
+
   return {
     ok: true,
     input: inputPaths,
     output: finalOutput,
     format,
     mode: 'cloud',
+    slideCount: inspect.slideCount,
+    stats: inspect.stats,
   };
 }
 
@@ -373,6 +386,13 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
           printSimplifiedNotice(
             envelope.simplified,
             envelope.mode,
+            ctx.quiet,
+            ctx.jsonOutput
+          );
+          printFontEmbedNotice(
+            envelope.stats?.fonts,
+            envelope.mode,
+            Boolean(options.embedFonts),
             ctx.quiet,
             ctx.jsonOutput
           );

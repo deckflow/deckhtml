@@ -307,13 +307,91 @@ function mergeSlidesMaps(
   return slideOffset + source.size;
 }
 
-function reportUsedFonts(usedFontsDeduped: string[]): void {
+function reportUsedFonts(
+  usedFontsDeduped: string[],
+  fontStats?: ReturnType<typeof buildFontStats>
+): void {
   if (usedFontsDeduped.length === 0) return;
   console.log(`\n📝 Fonts used in this presentation:`);
   usedFontsDeduped.forEach((name) => {
     console.log(`  - ${name}`);
   });
+
+  const embed = fontStats?.embed;
+  if (embed && (embed.matched.length > 0 || embed.unmatched.length > 0)) {
+    console.log(`\n🔤 Cloud embed font library (${embed.indexMeta.familyCount} families):`);
+    for (const item of embed.matched) {
+      const note =
+        item.used === item.matchedFamily
+          ? 'matched'
+          : `matched → ${item.matchedFamily}`;
+      console.log(`  ✓ ${item.used} (${note})`);
+    }
+    for (const name of embed.unmatched) {
+      console.log(`  ✗ ${name} (not in library)`);
+    }
+    if (embed.matched.length > 0) {
+      console.log(
+        '\n💡 Cloud: use --mode cloud --embed-fonts to embed matched fonts into the PPTX so anyone opening the file sees the same typography.'
+      );
+    }
+  }
+
   console.log('\n💡 Make sure these fonts are installed on the system where the PPTX will be opened.\n');
+}
+
+/**
+ * Inspect HTML inputs and collect slide/element/font statistics without generating PPTX.
+ */
+export async function inspectHtmlFonts(
+  options: ConversionOptions
+): Promise<{
+  usedFonts: string[];
+  slideCount: number;
+  stats: NonNullable<ConversionResult['stats']>;
+}> {
+  return runQuietly(Boolean(options.quiet), async () => {
+    const inputPaths = resolveInputPaths(options);
+    const platformFontContext = buildPlatformFontContext(options);
+    const loader = new HTMLLoader();
+    const mergedSlidesMap = new Map<number, ElementInfo[]>();
+    const usedFontsMap = new Map<string, UsedFontDescriptor>();
+    let slideCoordsNormalized = false;
+
+    await loader.init();
+
+    try {
+      let slideOffset = 0;
+      for (let i = 0; i < inputPaths.length; i++) {
+        const inputPath = inputPaths[i]!;
+        const result = await processSingleInput(
+          loader,
+          inputPath,
+          options,
+          platformFontContext,
+          usedFontsMap
+        );
+        slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
+        slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
+      }
+
+      const usedFontsDeduped = [
+        ...new Set(Array.from(usedFontsMap.values()).map((d) => d.fontFamily)),
+      ].sort();
+
+      return {
+        usedFonts: usedFontsDeduped,
+        slideCount: mergedSlidesMap.size,
+        stats: {
+          elements: buildElementStats(mergedSlidesMap),
+          fonts: buildFontStats(usedFontsMap),
+          simplified: buildSimplifiedStats(mergedSlidesMap),
+        },
+      };
+    } finally {
+      await loader.close().catch(() => {});
+    }
+  });
 }
 
 /**
@@ -394,6 +472,7 @@ export async function convertHtmlToPptx(
   }
 
   const usedFontsDeduped = [...new Set(Array.from(usedFontsMap.values()).map((d) => d.fontFamily))].sort();
+  const fontStats = buildFontStats(usedFontsMap);
 
   const generator = new PPTXGenerator({
     platformFontContext,
@@ -404,7 +483,7 @@ export async function convertHtmlToPptx(
   const data = await generator.generate(mergedSlidesMap);
   const slideCount = generator.getSlideCount();
 
-  reportUsedFonts(usedFontsDeduped);
+  reportUsedFonts(usedFontsDeduped, fontStats);
 
   return {
     data,
@@ -412,7 +491,7 @@ export async function convertHtmlToPptx(
     slideCount,
     stats: {
       elements: buildElementStats(mergedSlidesMap),
-      fonts: buildFontStats(usedFontsMap),
+      fonts: fontStats,
       simplified: buildSimplifiedStats(mergedSlidesMap),
     },
   };
