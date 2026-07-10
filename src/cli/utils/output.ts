@@ -234,7 +234,7 @@ export function printFontEmbedNotice(
   if (matched.length === 0 && unmatched.length === 0) return;
 
   console.error(
-    `Cloud embed font library (${indexMeta.familyCount} families from fonts-index.json):`
+    `Cloud embed font library (${indexMeta.familyCount} families from fonts-index.ts):`
   );
   for (const item of matched) {
     const note =

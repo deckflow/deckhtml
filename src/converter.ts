@@ -54,6 +54,23 @@ import {
   type PlaceholderMediaType,
 } from './utils/placeholder-assets';
 
+/**
+ * Background is rendered as a separate shape — strip a:highlight from host and per-run options
+ * (buildScriptSplitTextPieces / rich-text runs may still carry highlight from getTextOptions).
+ */
+function stripTextHighlights(textOptions: Record<string, unknown>, textContent: unknown): unknown {
+  delete textOptions.highlight;
+  if (!Array.isArray(textContent)) return textContent;
+  return textContent.map((run) => {
+    if (!run || typeof run !== 'object') return run;
+    const piece = run as { text?: string; options?: Record<string, unknown> };
+    if (!piece.options || piece.options.highlight === undefined) return run;
+    const nextOpts = { ...piece.options };
+    delete nextOpts.highlight;
+    return { ...piece, options: nextOpts };
+  });
+}
+
 export class ElementConverter {
   private registry: StyleEnhancementRegistry;
   private fontResolver?: (d: UsedFontDescriptor) => string;
@@ -897,7 +914,7 @@ export class ElementConverter {
         delete textBoxOptions.transparency;
         delete textBoxOptions.line;
         delete textBoxOptions.shadow;
-        delete textBoxOptions.highlight;
+        textContent = stripTextHighlights(textBoxOptions, textContent);
 
         return [
           bgShape,
@@ -919,7 +936,7 @@ export class ElementConverter {
         fit: 'none',
         wrap: false,
       };
-      delete pillOptions.highlight;
+      textContent = stripTextHighlights(pillOptions, textContent);
       if (fillOptions.fill) pillOptions.fill = fillOptions.fill;
       if (fillOptions.transparency !== undefined) {
         pillOptions.transparency = fillOptions.transparency;
@@ -973,7 +990,7 @@ export class ElementConverter {
       delete textBoxOptions.rectRadius;
       delete textBoxOptions.shadow;
       // Background is the roundRect shape — glyph highlight duplicates fill and breaks sizing
-      delete textBoxOptions.highlight;
+      textContent = stripTextHighlights(textBoxOptions, textContent);
 
       // Return both elements: shape first (background), then text (foreground)
       const bgShape: any = {

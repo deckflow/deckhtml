@@ -21,7 +21,7 @@ export interface ConversionElementStats {
 export interface ConversionFontStats {
   families: string[];
   variants: UsedFontDescriptor[];
-  /** Probe result against the cloud embed font library (../../fonts/fonts-index.json) */
+  /** Probe result against the cloud embed font library (../../fonts/fonts-index.ts) */
   embed?: FontEmbedProbeResult;
 }
 
