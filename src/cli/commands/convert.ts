@@ -30,10 +30,10 @@ import {
 import { resolveMode, validateCloudOnlyFlags } from '../utils/mode';
 import { resolveViewport } from '../utils/size';
 
-const DEFAULT_RENDER_WAIT = 3;
 const DEFAULT_TIMEOUT = 600;
 
 const VALID_PLATFORMS = ['win', 'mac', 'ios', 'android', 'linux'] as const;
+type CloudPlatform = 'mac' | 'win';
 
 export interface ConvertOptions {
   output?: string;
@@ -41,13 +41,7 @@ export interface ConvertOptions {
   format: string;
   width?: string;
   platform?: string;
-  renderWait: string;
-  rebuildSvg?: boolean;
-  rebuildChart?: boolean;
   embedFonts?: boolean;
-  mapMotion?: boolean;
-  webhook?: string;
-  retentionHours?: string;
   report?: boolean;
 }
 
@@ -63,44 +57,24 @@ function resolvePlatformOption(platform?: string): PlatformTarget {
   return platform as PlatformTarget;
 }
 
-function parsePositiveInt(value: string, flag: string): number {
-  const n = parseInt(value, 10);
-  if (!Number.isFinite(n) || n < 0) {
-    throw new Error(`Invalid ${flag}: ${value}`);
-  }
-  return n;
+function toCloudPlatform(platform: PlatformTarget): CloudPlatform {
+  return platform === 'mac' || platform === 'ios' ? 'mac' : 'win';
 }
 
 function buildCloudParams(
-  ctx: Context,
   options: ConvertOptions,
-  platform: PlatformTarget,
+  platform: CloudPlatform,
   viewport?: { width: number; height: number }
 ): Record<string, unknown> {
-  const retentionHours = options.retentionHours
-    ? parsePositiveInt(options.retentionHours, '--retention-hours')
-    : ctx.config.retentionHours;
-
-  if (retentionHours < 0 || retentionHours > 99) {
-    throw new Error('--retention-hours must be between 0 and 99');
-  }
-
   const params: Record<string, unknown> = {
     needEmbedFonts: Boolean(options.embedFonts),
-    renderWait: parsePositiveInt(options.renderWait, '--render-wait'),
-    rebuildSvg: Boolean(options.rebuildSvg),
-    rebuildChart: Boolean(options.rebuildChart),
-    mapMotion: Boolean(options.mapMotion),
-    webhook: options.webhook ?? ctx.config.get('webhook'),
-    retentionHours,
+    platform,
   };
 
   if (viewport) {
     params.width = viewport.width;
     params.height = viewport.height;
   }
-
-  params.platform = platform;
 
   return params;
 }
@@ -177,41 +151,33 @@ async function runCloudConvert(
 
   const deck = await ctx.getDeck();
   const spaceId = ctx.config.get('spaceId');
-  if (!spaceId) {
-    throw new Error(
-      'Space ID is missing. Run `deckhtml auth login` first or ensure your API key includes workspace context.'
-    );
-  }
 
-  const params = buildCloudParams(ctx, options, platform, viewport);
+  const params = buildCloudParams(options, toCloudPlatform(platform), viewport);
   const taskName = path.basename(inputPaths[0]!, path.extname(inputPaths[0]!));
 
+  logVerbose(ctx.verbose, ctx.quiet, `API base: ${ctx.config.apiBase}`);
+  logVerbose(
+    ctx.verbose,
+    ctx.quiet,
+    spaceId ? `Space ID: ${spaceId}` : 'Space ID: auto (GET /user/self)'
+  );
   logProgress(ctx.quiet, `Uploading ${inputPaths.length} file(s)...`);
 
-  let task;
-  if (format === 'png') {
-    task = await deck.convertHtmlToPng({
-      spaceId,
-      files: inputPaths,
-      name: taskName,
-      params: params as never,
-      upload: {
-        onProgress: (p: number) =>
-          logProgress(ctx.quiet, `Uploading: ${(p * 100).toFixed(1)}%`),
-      },
-    });
-  } else {
-    task = await deck.convertHtmlToPptx({
-      spaceId,
-      files: inputPaths,
-      name: taskName,
-      params: params as never,
-      upload: {
-        onProgress: (p: number) =>
-          logProgress(ctx.quiet, `Uploading: ${(p * 100).toFixed(1)}%`),
-      },
-    });
-  }
+  const taskInput = {
+    ...(spaceId ? { spaceId } : {}),
+    files: inputPaths,
+    name: taskName,
+    params: params as never,
+    upload: {
+      onProgress: (p: number) =>
+        logProgress(ctx.quiet, `Uploading: ${(p * 100).toFixed(1)}%`),
+    },
+  };
+
+  const task =
+    format === 'png'
+      ? await deck.convertHtmlToPng(taskInput)
+      : await deck.convertHtmlToPptx(taskInput);
 
   logProgress(ctx.quiet, `Task created: ${task.id}`);
   logProgress(ctx.quiet, 'Converting...');
@@ -271,19 +237,9 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     )
     .option(
       '--platform <platform>',
-      'Target platform for generic font mapping: win, mac, ios, android, linux (default: current OS; script/lang auto-detected from text)'
+      'Target platform: local supports win, mac, ios, android, linux; cloud uses mac or win (ios→mac, others→win)'
     )
-    .option(
-      '--render-wait <seconds>',
-      'Per-page wait before capture (cloud)',
-      String(DEFAULT_RENDER_WAIT)
-    )
-    .option('--rebuild-svg', 'Rebuild SVG objects (cloud only)', false)
-    .option('--rebuild-chart', 'Rebuild chart objects (cloud only)', false)
     .option('--embed-fonts', 'Embed fonts (cloud only)', false)
-    .option('--map-motion', 'Map animations (cloud only)', false)
-    .option('--webhook <url>', 'Callback URL (cloud)')
-    .option('--retention-hours <n>', 'Cloud file retention hours (0-99)')
     .option('--report', 'Generate conversion report next to output', false)
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {
@@ -321,10 +277,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
           );
 
           validateCloudOnlyFlags(mode, {
-            rebuildSvg: options.rebuildSvg,
-            rebuildChart: options.rebuildChart,
             embedFonts: options.embedFonts,
-            mapMotion: options.mapMotion,
           });
 
           const platform = resolvePlatformOption(options.platform);

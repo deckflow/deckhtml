@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@deckops/sdk':
-        specifier: ^0.7.0
-        version: 0.7.0
+        specifier: ^0.7.2
+        version: 0.7.2
       commander:
         specifier: ^11.1.0
         version: 11.1.0
@@ -39,8 +39,8 @@ importers:
 
 packages:
 
-  '@deckops/sdk@0.7.0':
-    resolution: {integrity: sha512-DzdQIwhCipnZTrSij4Zh6QlwEARiwlA76y87CvbnSuTTL4+zEauqB3ZLWXjyfX21aJ0jh6gW6/T566jcDKTuhg==}
+  '@deckops/sdk@0.7.2':
+    resolution: {integrity: sha512-ycNo2RjIRL5+oTHUQtrIk83ODqqnE7sd0empopnd38CwBYV6ymHUfQpfmMQloC9P0VmaRsr8LDJsUyWlWt07AQ==}
     engines: {node: '>=18.0.0'}
 
   '@types/node@20.19.43':
@@ -55,11 +55,6 @@ packages:
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
-
-  axios-retry@4.5.0:
-    resolution: {integrity: sha512-aR99oXhpEDGo0UuAlYcn2iGRds30k366Zfa05XWScR9QaQD4JYiP3/1Qt1u7YlefUOK+cn0CcwoL1oefavQUlQ==}
-    peerDependencies:
-      axios: 0.x || 1.x
 
   axios@1.18.1:
     resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
@@ -209,10 +204,6 @@ packages:
     engines: {node: '>=14.16'}
     hasBin: true
 
-  is-retry-allowed@2.2.0:
-    resolution: {integrity: sha512-XVm7LOeLpTW4jV19QSH38vkswxoLud8sQ57YwJVTPWdiaI9I8keEhGFpBlslyVsgdQy4Opg8QOLb8YRgsyZiQg==}
-    engines: {node: '>=10'}
-
   is-wsl@3.1.1:
     resolution: {integrity: sha512-e6rvdUCiQCAuumZslxRJWR/Doq4VpPR82kqclvcS0efgt430SlGIk05vdCN58+VrzgtIcfNODjozVielycD4Sw==}
     engines: {node: '>=16'}
@@ -319,12 +310,10 @@ packages:
 
 snapshots:
 
-  '@deckops/sdk@0.7.0':
+  '@deckops/sdk@0.7.2':
     dependencies:
       axios: 1.18.1
-      axios-retry: 4.5.0(axios@1.18.1)
       eventsource-parser: 1.1.2
-      form-data: 4.0.6
       p-limit: 5.0.0
     transitivePeerDependencies:
       - debug
@@ -345,11 +334,6 @@ snapshots:
       - supports-color
 
   asynckit@0.4.0: {}
-
-  axios-retry@4.5.0(axios@1.18.1):
-    dependencies:
-      axios: 1.18.1
-      is-retry-allowed: 2.2.0
 
   axios@1.18.1:
     dependencies:
@@ -485,8 +469,6 @@ snapshots:
   is-inside-container@1.0.0:
     dependencies:
       is-docker: 3.0.0
-
-  is-retry-allowed@2.2.0: {}
 
   is-wsl@3.1.1:
     dependencies:

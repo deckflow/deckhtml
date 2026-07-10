@@ -62,7 +62,9 @@ async function main(): Promise<void> {
     }
     outputError(
       error instanceof Error ? error : new Error(String(error)),
-      ctx.jsonOutput
+      ctx.jsonOutput,
+      'ERROR',
+      { apiBase: ctx.config.apiBase }
     );
     process.exit(ExitCode.ERROR);
   }

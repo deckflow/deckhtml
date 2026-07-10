@@ -18,10 +18,7 @@ export function resolveMode(
 }
 
 export interface CloudOnlyFlags {
-  rebuildSvg?: boolean;
-  rebuildChart?: boolean;
   embedFonts?: boolean;
-  mapMotion?: boolean;
 }
 
 export function validateCloudOnlyFlags(
@@ -30,10 +27,7 @@ export function validateCloudOnlyFlags(
 ): void {
   if (mode === 'local') {
     const used: string[] = [];
-    if (flags.rebuildSvg) used.push('--rebuild-svg');
-    if (flags.rebuildChart) used.push('--rebuild-chart');
     if (flags.embedFonts) used.push('--embed-fonts');
-    if (flags.mapMotion) used.push('--map-motion');
     if (used.length > 0) {
       throw new Error(
         `${used.join(', ')} are cloud-only flags and cannot be used in local mode.`

@@ -7,7 +7,7 @@ export function registerConfigCommands(program: Command, ctx: Context): void {
   config
     .command('set')
     .description('Set a configuration value')
-    .argument('<key>', 'api-key | webhook | retention-hours')
+    .argument('<key>', 'api-key | space-id | webhook | retention-hours')
     .argument('<value>', 'Configuration value')
     .action(async (key: string, value: string) => {
       try {
@@ -17,6 +17,14 @@ export function registerConfigCommands(program: Command, ctx: Context): void {
             ctx.output(
               { key, message: 'API key set successfully' },
               () => 'API key set successfully'
+            );
+            break;
+          case 'space-id':
+            await ctx.config.setSpaceId(value);
+            ctx.resetDeck();
+            ctx.output(
+              { key, value, message: 'Space ID set successfully' },
+              () => `Space ID set to ${value}`
             );
             break;
           case 'webhook':
@@ -40,7 +48,7 @@ export function registerConfigCommands(program: Command, ctx: Context): void {
           }
           default:
             throw new Error(
-              `Unknown config key: ${key}. Supported: api-key, webhook, retention-hours`
+              `Unknown config key: ${key}. Supported: api-key, space-id, webhook, retention-hours`
             );
         }
       } catch (error) {

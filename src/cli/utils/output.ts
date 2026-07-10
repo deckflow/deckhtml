@@ -192,12 +192,6 @@ export function attachSimplifiedToEnvelope(
   return { ...envelope, simplified };
 }
 
-function logCloudSimplifiedTip(): void {
-  console.error(
-    'Tip: Use --mode cloud --rebuild-chart --rebuild-svg for editable charts and SVG instead of rasterized images.'
-  );
-}
-
 export function printSimplifiedNotice(
   simplified: ConversionSimplifiedStats | undefined,
   mode: string,
@@ -213,11 +207,6 @@ export function printSimplifiedNotice(
       console.error(`  ${label}: ${count}`);
     }
     console.error('');
-  }
-
-  if (mode === 'local') {
-    logCloudSimplifiedTip();
-    if (!jsonOutput) console.error('');
   }
 }
 
@@ -254,9 +243,11 @@ export function printFontEmbedNotice(
     );
     console.error('');
   } else if (matched.length > 0) {
-    console.error(
-      'Tip: use --mode cloud --embed-fonts to embed matched fonts into the PPTX so anyone opening the file sees the same typography.'
-    );
+    const tip =
+      mode === 'cloud'
+        ? 'Tip: use --embed-fonts to embed matched fonts into the PPTX so anyone opening the file sees the same typography.'
+        : 'Tip: use --mode cloud --embed-fonts to embed matched fonts into the PPTX so anyone opening the file sees the same typography.';
+    console.error(tip);
     console.error('');
   }
 }

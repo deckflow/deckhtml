@@ -9,6 +9,10 @@ import {
   runLoginFlow,
   DEFAULT_PORT,
 } from './core/auth';
+import {
+  installApiErrorCapture,
+  shouldLogHttpRequests,
+} from './utils/api-error';
 import { ExitCode, outputError } from './utils/errors';
 
 export class Context {
@@ -46,6 +50,9 @@ export class Context {
     }
 
     if (!this.deck) {
+      await installApiErrorCapture({
+        logRequests: shouldLogHttpRequests(this.verbose),
+      });
       const { createDeck } = await import('@deckops/sdk');
       this.deck = createDeck({
         root: this.config.apiBase,
@@ -146,7 +153,7 @@ export class Context {
   error(input: unknown, code = 'ERROR', exitCode: number = ExitCode.ERROR): never {
     const err =
       input instanceof Error ? input : new Error(String(input ?? 'Unknown error'));
-    outputError(err, this.jsonOutput, code);
+    outputError(err, this.jsonOutput, code, { apiBase: this.config.apiBase });
     process.exit(exitCode);
   }
 
