@@ -26,7 +26,7 @@ async function main(): Promise<void> {
 
   program
     .name('deckhtml')
-    .description('Convert HTML to PPTX, PDF, or PNG')
+    .description('Convert HTML to PPTX or PNG')
     .version(CLI_VERSION, '-V, --version', 'Show version')
     .helpOption('-h, --help', 'Show help')
     .option('--json', 'Machine-readable JSON on stdout')

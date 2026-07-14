@@ -79,13 +79,7 @@ deckhtml https://example.com/deck.html -o deck.pptx --render-wait 9
 
 ***
 
-## Generate PDF or PNG Output
-
-Generate a PDF:
-
-```bash
-deckhtml index.html --format pdf -o deck.pdf
-```
+## Generate PNG Output
 
 Generate PNG frames from one HTML file:
 

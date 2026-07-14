@@ -2,7 +2,7 @@
 
 > Configure the DeckHTML CLI with shared flags for output format, execution mode, render timing, reports, logging, and cloud conversion context.
 
-DeckHTML converts HTML from files, stdin, or hosted URLs into PPTX, PDF, or PNG artifacts. Local conversion works without authentication; cloud execution and cloud-only enhancement flags require an API key.
+DeckHTML converts HTML from files, stdin, or hosted URLs into PPTX or PNG artifacts. Local conversion works without authentication; cloud execution and cloud-only enhancement flags require an API key.
 
 Run DeckHTML without installing:
 
@@ -23,7 +23,7 @@ These flags are supported by the primary conversion command.
 | Flag | Description | Default |
 | --- | --- | --- |
 | `-o, --output <path>` | Output path. | Same name and path as input when possible. |
-| `--format <format>` | Output format: `pptx`, `pdf`, or `png`. | `pptx` |
+| `--format <format>` | Output format: `pptx` or `png`. | `pptx` |
 | `--mode <mode>` | Execution mode: `auto`, `local`, or `cloud`. | `auto` |
 | `--render-wait <seconds>` | Wait before capturing each page. | `3` |
 | `--report` | Generate a conversion report next to the output. | Off |

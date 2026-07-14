@@ -2,7 +2,7 @@
 
 **语言：** [English](./README.md) · **简体中文** · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
-在终端中将 HTML 文件、标准输入或 URL 转换为 PPTX、PDF 或 PNG 演示文稿。
+在终端中将 HTML 文件、标准输入或 URL 转换为 PPTX 或 PNG 演示文稿。
 
 ## 快速开始
 
@@ -57,11 +57,9 @@ deckhtml https://example.com/deck.html -o deck.pptx
 | 格式 | 说明 |
 | --- | --- |
 | `pptx` | PowerPoint 演示文稿（默认） |
-| `pdf` | PDF 导出 |
 | `png` | PNG 帧输出 |
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --format png -o frames
 ```
 
@@ -141,7 +139,7 @@ export DECKHTML_API_KEY=your-api-key
 | `--report` | 生成转换报告 | 关闭 |
 | `--mode <mode>` | `auto`、`local` 或 `cloud` | `auto` |
 | `--render-wait <seconds>` | 每页捕获前等待秒数 | `3` |
-| `--format <format>` | `pptx`、`pdf` 或 `png` | `pptx` |
+| `--format <format>` | `pptx` 或 `png` | `pptx` |
 | `--webhook <url>` | 云端回调地址 | 配置项 |
 | `--retention-hours <n>` | 云端文件保留时长（小时） | 配置项 |
 

@@ -1,7 +1,7 @@
 ---
 name: deckhtml
 description: >-
-  Convert HTML decks to PPTX (also PDF/PNG via cloud) with DeckHTML CLI.
+  Convert HTML decks to PPTX (also PNG via cloud) with DeckHTML CLI.
   Use when the user asks to turn HTML into PowerPoint/PPTX, generate slides from
   HTML, export a deck, or run deckhtml / @deckflow/deckhtml conversion.
 ---
@@ -97,10 +97,10 @@ More HTML rules: [references/html-authoring.md](references/html-authoring.md)
 | Mode | When | Auth |
 | --- | --- | --- |
 | `local` (default for agents) | PPTX only; no API key | None |
-| `cloud` | PDF/PNG, or `--rebuild-svg` / `--rebuild-chart` / `--embed-fonts` / `--map-motion` | `DECKHTML_API_KEY` or `deckhtml auth login` |
+| `cloud` | PNG, or `--rebuild-svg` / `--rebuild-chart` / `--embed-fonts` / `--map-motion` | `DECKHTML_API_KEY` or `deckhtml auth login` |
 | `auto` | Cloud if key present, else local | Optional |
 
-Local cannot emit PDF/PNG. Cloud-only flags are invalid with `--mode local`.
+Local cannot emit PNG. Cloud-only flags are invalid with `--mode local`.
 
 ### 3. Run conversion
 
@@ -170,7 +170,7 @@ Requires peer deps: `playwright`, `pptxgenjs`. Local API is PPTX-only.
 - **Do** size slides to the viewport and use detectable slide hosts
 - **Do** re-convert after HTML fixes rather than editing PPTX XML
 - **Don't** use cloud-only flags without `--mode cloud` + API key
-- **Don't** expect local mode to output PDF/PNG
+- **Don't** expect local mode to output PNG
 - **Don't** put critical content only in CSS `::before`/`hover` without a DOM fallback
 
 ## Additional resources

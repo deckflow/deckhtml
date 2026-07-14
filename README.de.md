@@ -2,7 +2,7 @@
 
 **Sprachen:** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · **Deutsch** · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
-Konvertieren Sie HTML-Dateien, stdin oder URLs im Terminal in PPTX-, PDF- oder PNG-Präsentationen.
+Konvertieren Sie HTML-Dateien, stdin oder URLs im Terminal in PPTX- oder PNG-Präsentationen.
 
 ## Schnellstart
 
@@ -57,11 +57,9 @@ deckhtml https://example.com/deck.html -o deck.pptx
 | Format | Beschreibung |
 | --- | --- |
 | `pptx` | PowerPoint-Präsentation (Standard) |
-| `pdf` | PDF-Export |
 | `png` | PNG-Bildausgabe |
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --format png -o frames
 ```
 
@@ -141,7 +139,7 @@ Anmeldedaten werden lokal unter `~/.deckflow/credentials` gespeichert.
 | `--report` | Konvertierungsbericht erzeugen | Aus |
 | `--mode <mode>` | `auto`, `local` oder `cloud` | `auto` |
 | `--render-wait <seconds>` | Wartezeit vor Seitenaufnahme | `3` |
-| `--format <format>` | `pptx`, `pdf` oder `png` | `pptx` |
+| `--format <format>` | `pptx` oder `png` | `pptx` |
 | `--webhook <url>` | Cloud-Callback-URL | Config |
 | `--retention-hours <n>` | Cloud-Aufbewahrung (Stunden) | Config |
 

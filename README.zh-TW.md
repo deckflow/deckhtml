@@ -2,7 +2,7 @@
 
 **語言：** [English](./README.md) · [简体中文](./README.zh-CN.md) · **繁體中文** · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
-在終端機中將 HTML 檔案、標準輸入或 URL 轉換為 PPTX、PDF 或 PNG 簡報。
+在終端機中將 HTML 檔案、標準輸入或 URL 轉換為 PPTX 或 PNG 簡報。
 
 ## 快速開始
 
@@ -57,11 +57,9 @@ deckhtml https://example.com/deck.html -o deck.pptx
 | 格式 | 說明 |
 | --- | --- |
 | `pptx` | PowerPoint 簡報（預設） |
-| `pdf` | PDF 匯出 |
 | `png` | PNG 影格輸出 |
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --format png -o frames
 ```
 
@@ -141,7 +139,7 @@ export DECKHTML_API_KEY=your-api-key
 | `--report` | 產生轉換報告 | 關閉 |
 | `--mode <mode>` | `auto`、`local` 或 `cloud` | `auto` |
 | `--render-wait <seconds>` | 每頁擷取前等待秒數 | `3` |
-| `--format <format>` | `pptx`、`pdf` 或 `png` | `pptx` |
+| `--format <format>` | `pptx` 或 `png` | `pptx` |
 | `--webhook <url>` | 雲端回呼 URL | 設定項 |
 | `--retention-hours <n>` | 雲端檔案保留時間（小時） | 設定項 |
 

@@ -2,7 +2,7 @@
 
 **언어:** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · **한국어**
 
-터미널에서 HTML 파일, 표준 입력 또는 URL을 PPTX, PDF, PNG 프레젠테이션으로 변환합니다.
+터미널에서 HTML 파일, 표준 입력 또는 URL을 PPTX 또는 PNG 프레젠테이션으로 변환합니다.
 
 ## 빠른 시작
 
@@ -57,11 +57,9 @@ deckhtml https://example.com/deck.html -o deck.pptx
 | 형식 | 설명 |
 | --- | --- |
 | `pptx` | PowerPoint 프레젠테이션(기본값) |
-| `pdf` | PDF 내보내기 |
 | `png` | PNG 프레임 출력 |
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --format png -o frames
 ```
 
@@ -141,7 +139,7 @@ export DECKHTML_API_KEY=your-api-key
 | `--report` | 변환 보고서 생성 | 끔 |
 | `--mode <mode>` | `auto`, `local` 또는 `cloud` | `auto` |
 | `--render-wait <seconds>` | 각 페이지 캡처 전 대기 시간(초) | `3` |
-| `--format <format>` | `pptx`, `pdf` 또는 `png` | `pptx` |
+| `--format <format>` | `pptx` 또는 `png` | `pptx` |
 | `--webhook <url>` | 클라우드 콜백 URL | 설정 |
 | `--retention-hours <n>` | 클라우드 파일 보존 시간(시간) | 설정 |
 

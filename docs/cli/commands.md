@@ -40,7 +40,7 @@ Convert HTML input into a presentation artifact.
 | `--rebuild-chart` | Rebuild chart objects. Cloud only. | Off |
 | `--embed-fonts` | Embed fonts. Cloud only. | Off |
 | `--map-motion` | Map animations. Cloud only. | Off |
-| `--format <format>` | Choose `pptx`, `pdf`, or `png`. | `pptx` |
+| `--format <format>` | Choose `pptx` or `png`. | `pptx` |
 | `--webhook <url>` | Callback URL for cloud conversion events. | Config |
 | `--retention-hours <n>` | Cloud file retention time in hours. | Config |
 
@@ -102,7 +102,6 @@ Persistent settings are managed with `deckhtml config set`.
 | Format | Example | Description |
 | --- | --- | --- |
 | `pptx` | `deckhtml index.html --format pptx -o deck.pptx` | PowerPoint deck output. Default. |
-| `pdf` | `deckhtml index.html --format pdf -o deck.pdf` | PDF export. |
 | `png` | `deckhtml index.html --format png -o frames` | PNG frame output. |
 
 ## Install
@@ -127,7 +126,6 @@ deckhtml index.html -o deck.pptx
 cat index.html | deckhtml - -o deck.pptx
 deckhtml page1.html page2.html page3.html -o deck.pptx
 deckhtml https://example.com/deck.html -o deck.pptx --render-wait 9
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --mode cloud --embed-fonts -o deck.pptx
 deckhtml index.html -o deck.pptx --json
 deckhtml index.html -o deck.pptx --report

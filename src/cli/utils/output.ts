@@ -213,7 +213,7 @@ export function printSimplifiedNotice(
   }
 }
 
-/** PPTX-only: cloud embed library match tip. Not shown for PNG/PDF. */
+/** PPTX-only: cloud embed library match tip. Not shown for PNG. */
 export function printFontEmbedNotice(
   fonts: ConversionFontStats | undefined,
   mode: string,

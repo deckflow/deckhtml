@@ -2,7 +2,7 @@
 
 **言語：** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · **日本語** · [한국어](./README.ko.md)
 
-ターミナルから HTML ファイル、標準入力、または URL を PPTX、PDF、PNG プレゼンテーションに変換します。
+ターミナルから HTML ファイル、標準入力、または URL を PPTX または PNG プレゼンテーションに変換します。
 
 ## クイックスタート
 
@@ -57,11 +57,9 @@ deckhtml https://example.com/deck.html -o deck.pptx
 | 形式 | 説明 |
 | --- | --- |
 | `pptx` | PowerPoint プレゼンテーション（デフォルト） |
-| `pdf` | PDF エクスポート |
 | `png` | PNG フレーム出力 |
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --format png -o frames
 ```
 
@@ -141,7 +139,7 @@ export DECKHTML_API_KEY=your-api-key
 | `--report` | 変換レポートを生成 | オフ |
 | `--mode <mode>` | `auto`、`local` または `cloud` | `auto` |
 | `--render-wait <seconds>` | 各ページキャプチャ前の待機秒数 | `3` |
-| `--format <format>` | `pptx`、`pdf` または `png` | `pptx` |
+| `--format <format>` | `pptx` または `png` | `pptx` |
 | `--webhook <url>` | クラウドコールバック URL | 設定 |
 | `--retention-hours <n>` | クラウドファイル保持時間（時間） | 設定 |
 

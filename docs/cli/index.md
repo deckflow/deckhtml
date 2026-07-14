@@ -1,6 +1,6 @@
 # Overview
 
-> Convert HTML files, stdin, or URLs into PPTX, PDF, or PNG artifacts from your terminal.
+> Convert HTML files, stdin, or URLs into PPTX or PNG artifacts from your terminal.
 
 The DeckHTML CLI gives developers and agents command-line access to HTML-to-deck conversion. It accepts local files, multiple ordered HTML files, stdin, and hosted URLs. It runs synchronously by default, can choose between local and cloud execution, and supports machine-readable JSON output for scripts and CI.
 
@@ -99,7 +99,7 @@ deckhtml ./page.html -o deck.pptx --report
 Choose a different output format:
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
+deckhtml index.html --format png -o frames
 ```
 
 Supported formats are:
@@ -107,7 +107,6 @@ Supported formats are:
 | Format | Description |
 | --- | --- |
 | `pptx` | PowerPoint deck output. Default. |
-| `pdf` | PDF export. |
 | `png` | PNG frame output. |
 
 Use cloud mode for cloud-only reconstruction features:

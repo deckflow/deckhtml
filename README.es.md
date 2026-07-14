@@ -2,7 +2,7 @@
 
 **Idiomas:** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · **Español** · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
-Convierte archivos HTML, entrada estándar o URL en presentaciones PPTX, PDF o PNG desde la terminal.
+Convierte archivos HTML, entrada estándar o URL en presentaciones PPTX o PNG desde la terminal.
 
 ## Inicio rápido
 
@@ -57,11 +57,9 @@ deckhtml https://example.com/deck.html -o deck.pptx
 | Formato | Descripción |
 | --- | --- |
 | `pptx` | Presentación PowerPoint (predeterminado) |
-| `pdf` | Exportación PDF |
 | `png` | Salida en fotogramas PNG |
 
 ```bash
-deckhtml index.html --format pdf -o deck.pdf
 deckhtml index.html --format png -o frames
 ```
 
@@ -141,7 +139,7 @@ Las credenciales se guardan localmente en `~/.deckflow/credentials`.
 | `--report` | Generar informe de conversión | Desactivado |
 | `--mode <mode>` | `auto`, `local` o `cloud` | `auto` |
 | `--render-wait <seconds>` | Espera antes de capturar cada página | `3` |
-| `--format <format>` | `pptx`, `pdf` o `png` | `pptx` |
+| `--format <format>` | `pptx` o `png` | `pptx` |
 | `--webhook <url>` | URL de callback en la nube | Config |
 | `--retention-hours <n>` | Retención en la nube (horas) | Config |
 

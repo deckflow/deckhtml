@@ -1,7 +1,7 @@
 {
   "name": "@deckflow/deckhtml",
-  "version": "0.2.0",
-  "description": "Convert HTML to PPTX, PDF, or PNG presentations",
+  "version": "0.3.0",
+  "description": "Convert HTML to PPTX or PNG presentations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

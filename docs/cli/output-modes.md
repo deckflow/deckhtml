@@ -31,11 +31,11 @@ index.pptx
 Choose another format with `--format`:
 
 ```bash
-deckhtml report.html --format pdf -o report.pdf
+deckhtml report.html --format png -o frames
 ```
 
 ```text
-report.pdf
+frames
 ```
 
 For PNG output, use a file, stdin, URL, or multiple ordered HTML files:

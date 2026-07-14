@@ -151,14 +151,14 @@ export function resolveOutputFormat(explicitOutput?: string): OutputFormat {
   const ext = path.extname(explicitOutput).toLowerCase();
   if (!ext) {
     throw new Error(
-      `Cannot infer format from output path "${explicitOutput}". Use a .pptx, .pdf, or .png extension.`
+      `Cannot infer format from output path "${explicitOutput}". Use a .pptx or .png extension.`
     );
   }
 
   const format = FORMAT_BY_EXT[ext];
   if (!format) {
     throw new Error(
-      `Unsupported output extension "${ext}". Use .pptx, .pdf, or .png.`
+      `Unsupported output extension "${ext}". Use .pptx or .png.`
     );
   }
 

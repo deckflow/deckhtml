@@ -284,7 +284,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     .argument('[inputs...]', 'HTML file(s), URL, or "-" for stdin')
     .option(
       '-o, --output <path>',
-      'Output path (.pptx / .pdf / .png; format inferred from extension)'
+      'Output path (.pptx / .png; format inferred from extension)'
     )
     .option('--mode <mode>', 'Execution mode: auto, local, or cloud', 'auto')
     .option(

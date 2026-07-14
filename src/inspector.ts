@@ -894,7 +894,7 @@ export class ElementInspector {
   }
 
   /**
-   * Isolate one slide for raster capture (PNG/PDF multi-slide / active-gated decks).
+   * Isolate one slide for raster capture (PNG multi-slide / active-gated decks).
    */
   async prepareSlideForRasterExport(
     slideIndex: number,

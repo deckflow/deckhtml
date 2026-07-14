@@ -26,7 +26,7 @@ Stdin **requires** `-o` / `--output`.
 | Flag | Default | Notes |
 | --- | --- | --- |
 | `-o, --output <path>` | same basename as input | Required for stdin |
-| `--format <pptx\|pdf\|png>` | `pptx` | PDF/PNG need cloud |
+| `--format <pptx\|png>` | `pptx` | PNG needs cloud |
 | `--mode <auto\|local\|cloud>` | `auto` | Agents: prefer `local` |
 | `--width <pixels>` | `1280` local | Height = width × 720/1280 |
 | `--platform <win\|mac\|ios\|android\|linux>` | current OS | Generic font mapping |
@@ -77,7 +77,6 @@ deckhtml config set retention-hours 3
 | Capability | Local | Cloud |
 | --- | --- | --- |
 | PPTX | ✓ | ✓ |
-| PDF | ✗ | planned / via `--format pdf` (may error if unsupported) |
 | PNG frames | ✗ | ✓ |
 | Rebuild SVG/chart | ✗ | ✓ |
 | Embed fonts / map motion | ✗ | ✓ |

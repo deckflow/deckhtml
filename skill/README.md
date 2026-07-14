@@ -47,4 +47,4 @@ After install, agents should auto-discover the skill when the user asks for HTML
 1. Prefer `--mode local --json`
 2. Author slides as `.slide-container` at 1280×720 (or pass matching `--width`)
 3. Fix HTML and re-convert when fidelity is wrong
-4. Use cloud only for PDF/PNG or `--rebuild-*` / `--embed-fonts` / `--map-motion`
+4. Use cloud only for PNG or `--rebuild-*` / `--embed-fonts` / `--map-motion`
