@@ -12,7 +12,7 @@
     "deckhtml": "./dist/cli.js"
   },
   "scripts": {
-    "build": "npm run build:font-index && tsc",
+    "build": "tsc",
     "build:font-index": "npx tsx src/bin/build-embed-font-index.ts",
     "dev": "tsc --watch",
     "clean": "rm -rf dist/",

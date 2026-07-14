@@ -4,6 +4,8 @@
  */
 
 export { convertHtmlToPptx, inspectHtmlFonts } from './api';
+export { convertHtmlToPng, type PngConversionResult } from './png-export';
+export { buildPngOutputPaths } from './utils/png-output-path';
 export * from './types';
 export {
   buildConversionReport,

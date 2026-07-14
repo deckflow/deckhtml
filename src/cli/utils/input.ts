@@ -131,9 +131,43 @@ export async function materializeInputs(
   };
 }
 
+export type OutputFormat = 'pptx' | 'pdf' | 'png';
+
+const FORMAT_BY_EXT: Record<string, OutputFormat> = {
+  '.pptx': 'pptx',
+  '.pdf': 'pdf',
+  '.png': 'png',
+};
+
+/**
+ * Infer output format from `-o` extension.
+ * Without `-o`, defaults to pptx (path is derived from the input).
+ */
+export function resolveOutputFormat(explicitOutput?: string): OutputFormat {
+  if (!explicitOutput) {
+    return 'pptx';
+  }
+
+  const ext = path.extname(explicitOutput).toLowerCase();
+  if (!ext) {
+    throw new Error(
+      `Cannot infer format from output path "${explicitOutput}". Use a .pptx, .pdf, or .png extension.`
+    );
+  }
+
+  const format = FORMAT_BY_EXT[ext];
+  if (!format) {
+    throw new Error(
+      `Unsupported output extension "${ext}". Use .pptx, .pdf, or .png.`
+    );
+  }
+
+  return format;
+}
+
 export function deriveOutputPath(
   inputPaths: string[],
-  format: 'pptx' | 'pdf' | 'png',
+  format: OutputFormat,
   explicitOutput?: string
 ): string {
   if (explicitOutput) {
@@ -144,12 +178,12 @@ export function deriveOutputPath(
     throw new Error('--output is required when input path cannot be inferred.');
   }
 
-  const ext = format === 'pptx' ? '.pptx' : format === 'pdf' ? '.pdf' : '';
+  const ext = format === 'pptx' ? '.pptx' : format === 'pdf' ? '.pdf' : '.png';
   const first = inputPaths[0];
 
   if (format === 'png') {
     const base = path.basename(first, path.extname(first));
-    return path.resolve(path.dirname(first), base || 'frames');
+    return path.resolve(path.dirname(first), `${base || 'frames'}.png`);
   }
 
   if (inputPaths.length === 1) {

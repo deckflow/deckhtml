@@ -164,6 +164,8 @@ export interface ConversionResultEnvelope {
   ok: true;
   input: string[];
   output: string;
+  /** All generated artifact paths (e.g. multi-page local PNG). */
+  outputs?: string[];
   format: string;
   mode: string;
   slideCount?: number;
@@ -192,6 +194,7 @@ export function attachSimplifiedToEnvelope(
   return { ...envelope, simplified };
 }
 
+/** PPTX-only: which elements were rasterized during simplified conversion. */
 export function printSimplifiedNotice(
   simplified: ConversionSimplifiedStats | undefined,
   mode: string,
@@ -210,6 +213,7 @@ export function printSimplifiedNotice(
   }
 }
 
+/** PPTX-only: cloud embed library match tip. Not shown for PNG/PDF. */
 export function printFontEmbedNotice(
   fonts: ConversionFontStats | undefined,
   mode: string,
@@ -260,7 +264,13 @@ export function printSuccess(
     console.log(JSON.stringify(envelope));
     return;
   }
-  console.log(envelope.output);
+  const paths =
+    envelope.outputs && envelope.outputs.length > 0
+      ? envelope.outputs
+      : [envelope.output];
+  for (const p of paths) {
+    console.log(p);
+  }
 }
 
 export function logVerbose(verbose: boolean, quiet: boolean, message: string): void {

@@ -1,17 +1,20 @@
 import type { DeckTask } from '../types/sdk';
 import { Command } from 'commander';
-import { writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 import { convertHtmlToPptx, inspectHtmlFonts } from '../../api';
+import { convertHtmlToPng } from '../../png-export';
 import {
   detectCurrentPlatformTarget,
   type PlatformTarget,
 } from '../../utils/platformFontMap';
+import { buildPngOutputPaths } from '../../utils/png-output-path';
 import { Context } from '../context';
 import {
   deriveOutputPath,
   materializeInputs,
   resolveInputs,
+  resolveOutputFormat,
 } from '../utils/input';
 import {
   attachSimplifiedToEnvelope,
@@ -38,7 +41,6 @@ type CloudPlatform = 'mac' | 'win';
 export interface ConvertOptions {
   output?: string;
   mode: string;
-  format: string;
   width?: string;
   platform?: string;
   embedFonts?: boolean;
@@ -87,6 +89,46 @@ async function runLocalConvert(
   format: string,
   platform: PlatformTarget
 ): Promise<ConversionResultEnvelope> {
+  if (format === 'png') {
+    logVerbose(
+      ctx.verbose,
+      ctx.quiet,
+      `Rendering PNG from ${inputPaths.length} file(s)`
+    );
+    logVerbose(
+      ctx.verbose,
+      ctx.quiet,
+      `Viewport: ${viewport.width}x${viewport.height}`
+    );
+
+    const result = await convertHtmlToPng({
+      inputs: inputPaths,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      allowLocalResources: true,
+      quiet: ctx.quiet,
+    });
+
+    const outputPaths = buildPngOutputPaths(outputPath, result.images.length);
+    for (let i = 0; i < result.images.length; i++) {
+      const target = outputPaths[i]!;
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, result.images[i]!);
+      logVerbose(ctx.verbose, ctx.quiet, `Writing ${target}`);
+    }
+
+    return {
+      ok: true,
+      input: inputPaths,
+      output: outputPaths[0]!,
+      outputs: outputPaths,
+      format,
+      mode: 'local',
+      slideCount: result.slideCount,
+      stats: result.stats,
+    };
+  }
+
   if (format !== 'pptx') {
     throw new Error(
       `Format "${format}" is not supported in local mode. Use --mode cloud.`
@@ -204,6 +246,18 @@ async function runCloudConvert(
       ? writeResult.path
       : writeResult.path;
 
+  // Font / simplified stats are PPTX-oriented (embed tips, rasterized elements).
+  // PNG skips probing so local and cloud stay quiet and consistent.
+  if (format !== 'pptx') {
+    return {
+      ok: true,
+      input: inputPaths,
+      output: finalOutput,
+      format,
+      mode: 'cloud',
+    };
+  }
+
   logProgress(ctx.quiet, 'Probing fonts used in HTML...');
   const inspect = await inspectHtmlFonts({
     inputs: inputPaths,
@@ -228,9 +282,11 @@ async function runCloudConvert(
 export function registerConvertCommand(program: Command, ctx: Context): void {
   program
     .argument('[inputs...]', 'HTML file(s), URL, or "-" for stdin')
-    .option('-o, --output <path>', 'Output path')
+    .option(
+      '-o, --output <path>',
+      'Output path (.pptx / .pdf / .png; format inferred from extension)'
+    )
     .option('--mode <mode>', 'Execution mode: auto, local, or cloud', 'auto')
-    .option('--format <format>', 'Output format: pptx, pdf, or png', 'pptx')
     .option(
       '--width <pixels>',
       'Playwright viewport width (height scales at 16:9)'
@@ -247,13 +303,6 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       }
 
       try {
-        const format = options.format.toLowerCase();
-        if (!['pptx', 'pdf', 'png'].includes(format)) {
-          throw new Error(
-            `Invalid --format: ${options.format}. Use pptx, pdf, or png.`
-          );
-        }
-
         const modeInput = options.mode.toLowerCase();
         if (!['auto', 'local', 'cloud'].includes(modeInput)) {
           throw new Error(
@@ -271,6 +320,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
             );
           }
 
+          const format = resolveOutputFormat(options.output);
+
           const mode = resolveMode(
             modeInput as 'auto' | 'local' | 'cloud',
             ctx.hasCredentials()
@@ -282,11 +333,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
 
           const platform = resolvePlatformOption(options.platform);
 
-          const outputPath = deriveOutputPath(
-            paths,
-            format as 'pptx' | 'pdf' | 'png',
-            options.output
-          );
+          const outputPath = deriveOutputPath(paths, format, options.output);
 
           const localViewport = resolveViewport(options.width, true)!;
           const cloudViewport = resolveViewport(options.width, false);
@@ -336,19 +383,21 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
           }
 
           envelope = attachSimplifiedToEnvelope(envelope);
-          printSimplifiedNotice(
-            envelope.simplified,
-            envelope.mode,
-            ctx.quiet,
-            ctx.jsonOutput
-          );
-          printFontEmbedNotice(
-            envelope.stats?.fonts,
-            envelope.mode,
-            Boolean(options.embedFonts),
-            ctx.quiet,
-            ctx.jsonOutput
-          );
+          if (format === 'pptx') {
+            printSimplifiedNotice(
+              envelope.simplified,
+              envelope.mode,
+              ctx.quiet,
+              ctx.jsonOutput
+            );
+            printFontEmbedNotice(
+              envelope.stats?.fonts,
+              envelope.mode,
+              Boolean(options.embedFonts),
+              ctx.quiet,
+              ctx.jsonOutput
+            );
+          }
           printSuccess(envelope, ctx.jsonOutput);
           process.exit(0);
         } finally {

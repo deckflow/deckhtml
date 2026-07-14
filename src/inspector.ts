@@ -894,6 +894,214 @@ export class ElementInspector {
   }
 
   /**
+   * Isolate one slide for raster capture (PNG/PDF multi-slide / active-gated decks).
+   */
+  async prepareSlideForRasterExport(
+    slideIndex: number,
+    discovery: SlideContainerDiscovery
+  ): Promise<void> {
+    const slideSelector = this.slideIndexSelector(slideIndex);
+    await this.isolateOutsideSlideContainer(slideSelector, discovery);
+  }
+
+  /** Restore DOM after {@link prepareSlideForRasterExport}. */
+  async restoreSlideForRasterExport(): Promise<void> {
+    await this.restoreSlideIsolation();
+  }
+
+  /**
+   * Clip the document to one viewport-height slice for splitByHeight raster export.
+   */
+  async applyViewportClipForRaster(
+    offsetY: number,
+    viewport: { width: number; height: number }
+  ): Promise<void> {
+    const styleId = 'deckhtml-raster-clip-style';
+    await this.page.evaluate(
+      ({ styleId, offsetY, width, height }) => {
+        document.getElementById(styleId)?.remove();
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          html, body {
+            width: ${width}px !important;
+            height: ${height}px !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        `;
+        document.head.appendChild(style);
+
+        if (document.body) {
+          document.body.style.setProperty('transform', `translateY(-${offsetY}px)`, 'important');
+          document.body.style.setProperty('transform-origin', 'top left', 'important');
+          document.body.style.setProperty('width', `${width}px`, 'important');
+        }
+
+        window.scrollTo(0, 0);
+      },
+      { styleId, offsetY, width: viewport.width, height: viewport.height }
+    );
+    await this.waitForLayoutSettle();
+  }
+
+  /** Restore DOM after {@link applyViewportClipForRaster}. */
+  async restoreViewportClipForRaster(): Promise<void> {
+    await this.page.evaluate((styleId) => {
+      document.getElementById(styleId)?.remove();
+      if (document.body) {
+        document.body.style.removeProperty('transform');
+        document.body.style.removeProperty('transform-origin');
+        document.body.style.removeProperty('width');
+      }
+    }, 'deckhtml-raster-clip-style');
+    await this.waitForLayoutSettle();
+  }
+
+  /**
+   * Pin the visible page to the export viewport so screenshots match slide layout.
+   * Returns the CSS selector of the slide host used for capture.
+   */
+  async applyRasterExportFrame(
+    viewport: { width: number; height: number },
+    slideSelector?: string
+  ): Promise<string | null> {
+    const styleId = 'deckhtml-raster-frame-style';
+    const slideHostSelectors = [
+      slideSelector,
+      '[data-deckhtml-slide-index]',
+      '.slide-canvas',
+      '.slide-container',
+      '.slide-wrap',
+      '.slide',
+      '[data-slide]',
+      'section.slide',
+    ].filter((value): value is string => Boolean(value));
+
+    const resolvedSelector = await this.page.evaluate(
+      ({ styleId, width, height, slideHostSelectors }) => {
+        document.getElementById(styleId)?.remove();
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          html, body {
+            width: ${width}px !important;
+            height: ${height}px !important;
+            min-height: ${height}px !important;
+            max-height: ${height}px !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        `;
+        document.head.appendChild(style);
+
+        if (document.body) {
+          document.body.style.setProperty('display', 'block', 'important');
+          document.body.style.setProperty('width', `${width}px`, 'important');
+          document.body.style.setProperty('height', `${height}px`, 'important');
+          document.body.style.setProperty('overflow', 'hidden', 'important');
+          document.body.style.setProperty('margin', '0', 'important');
+          document.body.style.setProperty('padding', '0', 'important');
+        }
+
+        let matchedSelector: string | null = null;
+        let slide: Element | null = null;
+        for (const candidate of slideHostSelectors) {
+          slide = document.querySelector(candidate);
+          if (slide) {
+            matchedSelector = candidate;
+            break;
+          }
+        }
+        if (!slide) {
+          slide = document.body?.firstElementChild ?? null;
+        }
+
+        if (slide instanceof HTMLElement) {
+          const bg = window.getComputedStyle(slide).backgroundColor;
+          if (document.body && bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+            document.body.style.setProperty('background-color', bg, 'important');
+          }
+
+          slide.style.setProperty('margin', '0', 'important');
+          slide.style.setProperty('position', 'relative', 'important');
+          slide.style.setProperty('top', '0', 'important');
+          slide.style.setProperty('left', '0', 'important');
+          slide.style.setProperty('width', `${width}px`, 'important');
+          slide.style.setProperty('height', `${height}px`, 'important');
+          slide.style.setProperty('box-shadow', 'none', 'important');
+        }
+
+        document.querySelectorAll('.reveal').forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          node.style.setProperty('opacity', '1', 'important');
+          node.style.setProperty('visibility', 'visible', 'important');
+          node.classList.add('show');
+        });
+
+        document.querySelectorAll('*').forEach((node) => {
+          if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
+          node.style.setProperty('animation', 'none', 'important');
+          node.style.setProperty('transition', 'none', 'important');
+        });
+
+        window.scrollTo(0, 0);
+        return matchedSelector;
+      },
+      {
+        styleId,
+        width: viewport.width,
+        height: viewport.height,
+        slideHostSelectors,
+      }
+    );
+    await this.waitForLayoutSettle();
+    return resolvedSelector;
+  }
+
+  slideIndexSelector(slideIndex: number): string {
+    return `[${SLIDE_INDEX_ATTR}="${slideIndex}"]`;
+  }
+
+  /** Restore DOM after {@link applyRasterExportFrame}. */
+  async restoreRasterExportFrame(): Promise<void> {
+    await this.page.evaluate((styleId) => {
+      document.getElementById(styleId)?.remove();
+      document.querySelectorAll(
+        '[data-deckhtml-slide-index], .slide-container, .slide-canvas, .slide-wrap, .slide, [data-slide]'
+      ).forEach((node) => {
+        if (!(node instanceof HTMLElement)) return;
+        for (const prop of ['margin', 'position', 'top', 'left', 'width', 'height', 'box-shadow']) {
+          node.style.removeProperty(prop);
+        }
+      });
+      if (document.body) {
+        for (const prop of [
+          'display',
+          'width',
+          'height',
+          'overflow',
+          'margin',
+          'padding',
+          'background-color',
+        ]) {
+          document.body.style.removeProperty(prop);
+        }
+      }
+      if (document.documentElement) {
+        for (const prop of ['width', 'height', 'overflow', 'margin', 'padding']) {
+          document.documentElement.style.removeProperty(prop);
+        }
+      }
+    }, 'deckhtml-raster-frame-style');
+    await this.waitForLayoutSettle();
+  }
+
+  /**
    * Inspect all visible elements in the page
    */
   async inspectElements(
