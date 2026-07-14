@@ -9,6 +9,10 @@ import {
   type SlideContainerDiscovery,
 } from './inspector';
 import { setViewportPixels } from './utils/coordinate';
+import {
+  resolveSlideInspectConcurrency,
+  runAsyncPool,
+} from './utils/async-pool';
 import { runQuietly } from './utils/quiet';
 import { EMPTY_CONVERSION_STATS, type ConversionStats } from './conversion-report';
 import type { ConversionOptions } from './types';
@@ -168,34 +172,73 @@ async function exportSingleInputToPng(
 /**
  * Convert HTML input(s) to one or more PNG buffers using Playwright screenshots.
  * Multi-slide decks and multi-file inputs produce one image per page, in order.
+ * Multiple HTML files are processed concurrently (CPU cores − 2), matching PPTX.
  */
 export async function convertHtmlToPng(
   options: ConversionOptions
 ): Promise<PngConversionResult> {
   return runQuietly(Boolean(options.quiet), async () => {
     const inputPaths = resolveInputPaths(options);
-    const loader = new HTMLLoader();
-    await loader.init();
+    const concurrency = resolveSlideInspectConcurrency();
+    const parallelInputs = inputPaths.length > 1 && concurrency > 1;
 
-    try {
-      const images: Buffer[] = [];
+    let images: Buffer[];
 
-      for (let i = 0; i < inputPaths.length; i++) {
-        const inputPath = inputPaths[i]!;
-        if (inputPaths.length > 1 && !options.quiet) {
-          console.error(`\n📄 Processing ${i + 1}/${inputPaths.length}: ${inputPath}`);
-        }
-        const pages = await exportSingleInputToPng(loader, inputPath, options);
-        images.push(...pages);
+    if (parallelInputs) {
+      const fileConcurrency = Math.min(concurrency, inputPaths.length);
+      if (!options.quiet) {
+        console.error(
+          `⚡ Parallel PNG: ${fileConcurrency} HTML files at a time (CPU cores − 2)`
+        );
       }
 
-      return {
-        images,
-        slideCount: images.length,
-        stats: EMPTY_CONVERSION_STATS,
-      };
-    } finally {
-      await loader.close().catch(() => {});
+      const indexed = inputPaths.map((path, index) => ({ path, index }));
+      const completed = await runAsyncPool(
+        indexed,
+        fileConcurrency,
+        async ({ path, index }) => {
+          if (!options.quiet) {
+            console.error(
+              `\n📄 Processing ${index + 1}/${inputPaths.length}: ${path}`
+            );
+          }
+          const fileLoader = new HTMLLoader();
+          await fileLoader.init();
+          try {
+            const pages = await exportSingleInputToPng(fileLoader, path, options);
+            return { index, pages };
+          } finally {
+            await fileLoader.close().catch(() => {});
+          }
+        }
+      );
+
+      completed.sort((a, b) => a.index - b.index);
+      images = completed.flatMap(({ pages }) => pages);
+    } else {
+      const loader = new HTMLLoader();
+      await loader.init();
+      try {
+        images = [];
+        for (let i = 0; i < inputPaths.length; i++) {
+          const inputPath = inputPaths[i]!;
+          if (inputPaths.length > 1 && !options.quiet) {
+            console.error(
+              `\n📄 Processing ${i + 1}/${inputPaths.length}: ${inputPath}`
+            );
+          }
+          const pages = await exportSingleInputToPng(loader, inputPath, options);
+          images.push(...pages);
+        }
+      } finally {
+        await loader.close().catch(() => {});
+      }
     }
+
+    return {
+      images,
+      slideCount: images.length,
+      stats: EMPTY_CONVERSION_STATS,
+    };
   });
 }

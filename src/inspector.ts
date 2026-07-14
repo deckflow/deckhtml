@@ -1043,8 +1043,60 @@ export class ElementInspector {
           node.classList.add('show');
         });
 
+        // Finish animations at end-state, then bake computed paint props before
+        // clearing animation. Otherwise `animation: none` drops fill-mode:forwards
+        // back to base styles (often opacity:0) and PNG captures go blank.
+        const FROZEN_ATTR = 'data-deckhtml-raster-frozen';
+        const bakeProps = [
+          'opacity',
+          'transform',
+          'visibility',
+          'filter',
+          'clip-path',
+          'translate',
+          'rotate',
+          'scale',
+        ];
+
+        try {
+          const root = document.documentElement;
+          const animations =
+            typeof root.getAnimations === 'function'
+              ? root.getAnimations({ subtree: true })
+              : document.getAnimations();
+          for (const anim of animations) {
+            try {
+              anim.finish();
+            } catch {
+              try {
+                anim.cancel();
+              } catch {
+                /* infinite / already settled */
+              }
+            }
+          }
+        } catch {
+          /* getAnimations unavailable */
+        }
+
         document.querySelectorAll('*').forEach((node) => {
           if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
+          const cs = window.getComputedStyle(node);
+          const hasAnim = Boolean(cs.animationName && cs.animationName !== 'none');
+          const hasTransition = Boolean(
+            cs.transitionDuration &&
+              cs.transitionDuration !== '0s' &&
+              cs.transitionProperty !== 'none'
+          );
+          if (hasAnim || hasTransition) {
+            node.setAttribute(FROZEN_ATTR, 'bake');
+            for (const prop of bakeProps) {
+              const value = cs.getPropertyValue(prop);
+              if (value) node.style.setProperty(prop, value, 'important');
+            }
+          } else {
+            node.setAttribute(FROZEN_ATTR, 'anim-only');
+          }
           node.style.setProperty('animation', 'none', 'important');
           node.style.setProperty('transition', 'none', 'important');
         });
@@ -1071,6 +1123,30 @@ export class ElementInspector {
   async restoreRasterExportFrame(): Promise<void> {
     await this.page.evaluate((styleId) => {
       document.getElementById(styleId)?.remove();
+      const FROZEN_ATTR = 'data-deckhtml-raster-frozen';
+      const bakeProps = [
+        'opacity',
+        'transform',
+        'visibility',
+        'filter',
+        'clip-path',
+        'translate',
+        'rotate',
+        'scale',
+      ];
+      document.querySelectorAll(`[${FROZEN_ATTR}]`).forEach((node) => {
+        if (!(node instanceof HTMLElement || node instanceof SVGElement)) return;
+        const el = node as HTMLElement;
+        const mode = node.getAttribute(FROZEN_ATTR);
+        el.style.removeProperty('animation');
+        el.style.removeProperty('transition');
+        if (mode === 'bake') {
+          for (const prop of bakeProps) {
+            el.style.removeProperty(prop);
+          }
+        }
+        node.removeAttribute(FROZEN_ATTR);
+      });
       document.querySelectorAll(
         '[data-deckhtml-slide-index], .slide-container, .slide-canvas, .slide-wrap, .slide, [data-slide]'
       ).forEach((node) => {

@@ -96,7 +96,8 @@ export class HTMLLoader {
     });
 
     await page.evaluate(() => document.fonts.ready);
-    await page.waitForTimeout(2000);
+    // Match slide-isolation settle: entrance animations / delayed reveals.
+    await page.waitForTimeout(3000);
   }
 
   /**
