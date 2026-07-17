@@ -1,6 +1,6 @@
 {
   "name": "@deckflow/deckhtml",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Convert HTML to PPTX or PNG presentations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,6 +14,7 @@
   "scripts": {
     "build": "tsc",
     "build:font-index": "npx tsx src/bin/build-embed-font-index.ts",
+    "build:fa-eot": "node scripts/build-fa-eot.mjs",
     "dev": "tsc --watch",
     "clean": "rm -rf dist/",
     "link:dev": "npm run build && npm link",

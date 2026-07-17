@@ -30,6 +30,11 @@ export {
   matchEmbeddableFont,
   EMBED_FONT_INDEX_META,
 } from './utils/embedFonts';
+export { embedFontAwesomeFonts } from './utils/fa-font-embedder';
+export {
+  normalizeFontAwesomeFreeFamily,
+  normalizeFontAwesomeFamily,
+} from './utils/style';
 export {
   isChineseFont,
   matchChineseFontAlias,

@@ -37,6 +37,7 @@ import {
   ScriptFontFaces,
   parseScriptFontFaces,
   normalizeFontAwesomeFreeFamily,
+  normalizeFontAwesomeFamily,
   isBold,
   isItalic,
   isInlinePillBox,
@@ -109,6 +110,17 @@ export class ElementConverter {
             italic: isItalic(styles.fontStyle),
           })
         : faFreeFace;
+      return { latin, ea: latin, cs: 'Arial' };
+    }
+    const faFace = normalizeFontAwesomeFamily(styles.fontFamily, styles.fontWeight?.toString());
+    if (faFace) {
+      const latin = this.fontResolver
+        ? this.fontResolver({
+            fontFamily: faFace,
+            bold: false,
+            italic: isItalic(styles.fontStyle),
+          })
+        : faFace;
       return { latin, ea: latin, cs: 'Arial' };
     }
 

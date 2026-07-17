@@ -427,6 +427,11 @@ export function isBold(fontWeight: string | undefined): boolean {
 const FONT_AWESOME_6_FREE_SOLID = 'Font Awesome 6 Free Solid';
 const FONT_AWESOME_6_FREE_REGULAR = 'Font Awesome 6 Free Regular';
 
+/** PPTX face names for Font Awesome Brands (kept in sync with EOT assets). */
+const FONT_AWESOME_6_BRANDS = 'Font Awesome 6 Brands';
+const FONT_AWESOME_5_BRANDS = 'Font Awesome 5 Brands';
+const FONT_AWESOME_V4_COMPATIBILITY = 'Font Awesome v4 Compatibility';
+
 function firstFontFamilyToken(fontFamily: string | undefined): string {
   if (!fontFamily) return '';
   return fontFamily.split(',')[0].trim().replace(/['"]/g, '');
@@ -451,6 +456,33 @@ export function normalizeFontAwesomeFreeFamily(
   if (/^Font Awesome 6 Free Solid$/i.test(first)) return FONT_AWESOME_6_FREE_SOLID;
 
   return isBold(fontWeight) ? FONT_AWESOME_6_FREE_SOLID : FONT_AWESOME_6_FREE_REGULAR;
+}
+
+/**
+ * Normalize any Font Awesome family (Free Solid/Regular, Brands, v4 Compatibility) to the
+ * discrete PPTX face name that matches a pre-built EOT in assets/fonts/font-awesome/.
+ * Returns undefined for non–Font Awesome stacks so the caller can fall back to the
+ * normal script-face resolution.
+ *
+ * Brands bypass normalizeFontAwesomeFreeFamily because they are a separate family (not Free),
+ * and their computed fontFamilySpecified can be wrong (e.g. inherited "Arial, sans-serif"),
+ * which would otherwise let platform font mapping replace the FA face with Arial.
+ */
+export function normalizeFontAwesomeFamily(
+  fontFamily: string | undefined,
+  fontWeight: string | undefined
+): string | undefined {
+  const free = normalizeFontAwesomeFreeFamily(fontFamily, fontWeight);
+  if (free) return free;
+
+  const first = firstFontFamilyToken(fontFamily);
+  if (!first || !/^Font Awesome/i.test(first)) return undefined;
+
+  if (/v4\s*compatibility/i.test(first)) return FONT_AWESOME_V4_COMPATIBILITY;
+  if (!/brands/i.test(first)) return undefined;
+
+  if (/^Font Awesome 6/i.test(first)) return FONT_AWESOME_6_BRANDS;
+  return FONT_AWESOME_5_BRANDS;
 }
 
 /**
@@ -944,15 +976,18 @@ export function getTextOptions(
     styles.fontFamily,
     styles.fontWeight?.toString()
   );
-  options.fontFace =
+  const faFace =
     faFreeFace ??
+    normalizeFontAwesomeFamily(styles.fontFamily, styles.fontWeight?.toString());
+  options.fontFace =
+    faFace ??
     parseScriptFontFaces(styles.fontFamily, {
       platformFontContext,
       specifiedFontFamily: styles.fontFamilySpecified,
       textScript,
     }).latin;
 
-  if (!faFreeFace && isBold(styles.fontWeight)) options.bold = true;
+  if (!faFace && isBold(styles.fontWeight)) options.bold = true;
 
   if (isItalic(styles.fontStyle)) options.italic = true;
   if (hasUnderline(styles.textDecoration)) options.underline = true;

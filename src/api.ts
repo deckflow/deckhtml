@@ -21,6 +21,7 @@ import {
   isBold,
   isItalic,
   normalizeFontAwesomeFreeFamily,
+  normalizeFontAwesomeFamily,
   parseScriptFontFaces,
 } from './utils/style';
 import {
@@ -29,6 +30,7 @@ import {
 } from './utils/textScript';
 import { buildPlatformFontContext, PlatformFontContext } from './utils/platformFontMap';
 import { runQuietly } from './utils/quiet';
+import { embedFontAwesomeFonts } from './utils/fa-font-embedder';
 import { buildElementStats, buildFontStats, buildSimplifiedStats } from './conversion-report';
 
 /**
@@ -119,6 +121,11 @@ function collectFontsFromElements(
     );
     if (faFreeFace) {
       registerFont(faFreeFace, styles, false);
+      return;
+    }
+    const faFace = normalizeFontAwesomeFamily(styles.fontFamily, styles.fontWeight?.toString());
+    if (faFace) {
+      registerFont(faFace, styles, false);
       return;
     }
 
@@ -483,10 +490,15 @@ export async function convertHtmlToPptx(
   const data = await generator.generate(mergedSlidesMap);
   const slideCount = generator.getSlideCount();
 
+  // Font Awesome is the only font family embedded locally — its icon glyphs must
+  // travel with the PPTX or icons render as empty boxes on machines without FA.
+  // All other font embedding is handled by the cloud pipeline.
+  const dataWithFaFonts = await embedFontAwesomeFonts(data);
+
   reportUsedFonts(usedFontsDeduped, fontStats);
 
   return {
-    data,
+    data: dataWithFaFonts,
     usedFonts: usedFontsDeduped,
     slideCount,
     stats: {
