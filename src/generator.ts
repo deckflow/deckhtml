@@ -12,8 +12,12 @@ import { StyleEnhancementRegistry } from './enhancer/registry';
 import { applyStyleEnhancements } from './enhancer/processor';
 import { parseColor } from './utils/style';
 import { fixPresentationXmlOrderInPptx } from './utils/pptx-presentation-xml-fix';
-import { validateImageUrl, validateDataImageUrl } from './utils/resource-policy';
+import { resolveImageSourceForPptx, validateDataImageUrl } from './utils/resource-policy';
 import { getPlaceholderForMediaType } from './utils/placeholder-assets';
+import { ensurePptxgenAllowsHttp } from './utils/pptxgen-http-patch';
+
+// pptxgenjs must accept plain http:// for all remote media types.
+ensurePptxgenAllowsHttp();
 
 export interface PPTXGeneratorOptions {
   fontResolver?: (d: UsedFontDescriptor) => string;
@@ -178,16 +182,16 @@ export class PPTXGenerator {
             const sourceElement = converted._sourceElement as ElementInfo;
             const fallbackColor = parseColor(sourceElement?.styles?.backgroundColor)?.color ?? '1A1818';
 
-            const useImage = imagePath && (await validateImageUrl(imagePath));
-            if (imagePath && !useImage) {
+            const resolvedBg = imagePath ? await resolveImageSourceForPptx(imagePath) : null;
+            if (imagePath && !resolvedBg) {
               console.warn(`⚠️  Background image unavailable or invalid (404/non-image), using fallback color: ${imagePath}`);
             }
-            if (useImage && imagePath.startsWith('data:')) {
-              slide.background = { data: imagePath };
+            if (resolvedBg?.kind === 'data') {
+              slide.background = { data: resolvedBg.data };
+            } else if (resolvedBg?.kind === 'path') {
+              slide.background = { path: resolvedBg.path };
             } else {
-              slide.background = useImage
-                ? { path: imagePath }
-                : { color: fallbackColor };
+              slide.background = { color: fallbackColor };
             }
             const gradientData = converted._gradientData;
             const overlayShape = {
@@ -450,13 +454,18 @@ export class PPTXGenerator {
       case 'image': {
         const imageOpts = { ...converted.options };
         if (imageOpts.path) {
-          const valid = await validateImageUrl(imageOpts.path);
-          if (!valid) {
+          const resolved = await resolveImageSourceForPptx(imageOpts.path);
+          if (!resolved) {
             console.warn(
               `⚠️  Image unavailable or invalid, using placeholder: ${imageOpts.path}`
             );
             imageOpts.data = getPlaceholderForMediaType('image');
             delete imageOpts.path;
+          } else if (resolved.kind === 'data') {
+            imageOpts.data = resolved.data;
+            delete imageOpts.path;
+          } else {
+            imageOpts.path = resolved.path;
           }
         } else if (imageOpts.data) {
           if (!validateDataImageUrl(imageOpts.data)) {

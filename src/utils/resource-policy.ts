@@ -1,13 +1,17 @@
 /**
  * Resource loading policy for Playwright and PPTX media validation.
  * Strict mode: local HTML may only load its own file:// document; all other
- * file:// subresources are blocked. data:, blob:, and http(s): are allowed.
+ * file:// subresources are blocked. data:, blob:, http://, and https:// are
+ * all allowed — never force-upgrade http to https.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import type { Page, Route } from 'playwright';
+
+/** Timeout for remote media probe/download used before pptxgenjs embed. */
+const REMOTE_MEDIA_TIMEOUT_MS = 30_000;
 
 export type ResourcePolicyMode = 'local' | 'remote';
 
@@ -63,6 +67,8 @@ export function isResourceRequestAllowed(
   }
 
   if (lower.startsWith('http://') || lower.startsWith('https://')) {
+    // Allow both protocols for every resource type (img/css/font/script/…).
+    // Do not rewrite or require https.
     return true;
   }
 
@@ -119,31 +125,46 @@ export async function setupResourcePolicyOnPage(
  * Validate that a URL returns a valid image (not 404 HTML, etc.)
  */
 export async function validateImageUrl(url: string): Promise<boolean> {
-  if (!url) return false;
+  return (await resolveImageSourceForPptx(url)) !== null;
+}
+
+export type ResolvedImageSource =
+  | { kind: 'data'; data: string }
+  | { kind: 'path'; path: string };
+
+/**
+ * Resolve an image URL for pptxgenjs.
+ * Keeps the original http:// or https:// URL (no protocol upgrade).
+ * Call ensurePptxgenAllowsHttp() before write so pptxgenjs can fetch http://.
+ */
+export async function resolveImageSourceForPptx(
+  url: string
+): Promise<ResolvedImageSource | null> {
+  if (!url) return null;
 
   if (url.startsWith('data:')) {
-    return validateDataImageUrl(url);
+    return validateDataImageUrl(url) ? { kind: 'data', data: url } : null;
   }
 
   try {
     const response = await fetch(url, {
       method: 'GET',
       redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(REMOTE_MEDIA_TIMEOUT_MS),
     });
-    if (!response.ok) return false;
+    if (!response.ok) return null;
 
     const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
-    if (!contentType.startsWith('image/')) return false;
+    if (!contentType.startsWith('image/')) return null;
 
-    const buffer = await response.arrayBuffer();
-    const arr = new Uint8Array(buffer);
-    const start = String.fromCharCode(...arr.slice(0, Math.min(50, arr.length)));
-    if (/^\s*<(!DOCTYPE|html|[\w-]+)/i.test(start)) return false;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const start = buffer.subarray(0, Math.min(50, buffer.length)).toString('utf8');
+    if (/^\s*<(!DOCTYPE|html|[\w-]+)/i.test(start)) return null;
 
-    return true;
+    // Pass through original URL (http:// or https://). pptxgenjs downloads it.
+    return { kind: 'path', path: url };
   } catch {
-    return false;
+    return null;
   }
 }
 

@@ -8,6 +8,7 @@ import path from "node:path";
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import { getSlideWidthPx, getSlideHeightPx } from './utils/coordinate';
 import { setupResourcePolicyOnPage } from './utils/resource-policy';
+import { gotoAndSettle } from './utils/navigate';
 
 // 浏览器数据目录, 默认为用户主目录下的 browser-data 文件夹
 const browserDataDir = process.env.BROWSER_DATA_DIR || path.join(os.homedir(), "browser-data");
@@ -34,6 +35,9 @@ export class HTMLLoader {
     }
     this.browser = await chromium.launchPersistentContext(browserDataDir, {
       headless: true,
+      // Allow http:// subresources (css/font/img/script) without forcing https.
+      ignoreHTTPSErrors: true,
+      args: ['--allow-running-insecure-content'],
     });
     browser = this.browser;
     browser.on('close', () => {
@@ -90,14 +94,8 @@ export class HTMLLoader {
       allowLocalResources: options?.allowLocalResources,
     });
 
-    await page.goto(documentUrl, {
-      waitUntil: 'networkidle',
-      timeout: 30000,
-    });
-
-    await page.evaluate(() => document.fonts.ready);
-    // Match slide-isolation settle: entrance animations / delayed reveals.
-    await page.waitForTimeout(3000);
+    // Match prior slide-isolation settle (entrance animations / delayed reveals).
+    await gotoAndSettle(page, documentUrl, { settleMs: 3000 });
   }
 
   /**
