@@ -1,6 +1,5 @@
 import type { DeckTask } from '../types/sdk';
 import { Command } from 'commander';
-import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 import { convertHtmlToPptx, inspectHtmlFonts } from '../../api';
 import { convertHtmlToPng } from '../../png-export';
@@ -32,6 +31,7 @@ import {
 } from '../../conversion-report';
 import { resolveMode, validateCloudOnlyFlags } from '../utils/mode';
 import { resolveViewport } from '../utils/size';
+import { atomicWriteFile } from '../utils/write';
 
 const DEFAULT_TIMEOUT = 600;
 
@@ -46,6 +46,7 @@ export interface ConvertOptions {
   embedFonts?: boolean;
   report?: boolean;
   executablePath?: string;
+  force?: boolean;
 }
 
 function resolvePlatformOption(platform?: string): PlatformTarget {
@@ -89,7 +90,8 @@ async function runLocalConvert(
   viewport: { width: number; height: number },
   format: string,
   platform: PlatformTarget,
-  executablePath?: string
+  executablePath?: string,
+  force?: boolean
 ): Promise<ConversionResultEnvelope> {
   if (format === 'png') {
     logVerbose(
@@ -115,8 +117,7 @@ async function runLocalConvert(
     const outputPaths = buildPngOutputPaths(outputPath, result.images.length);
     for (let i = 0; i < result.images.length; i++) {
       const target = outputPaths[i]!;
-      mkdirSync(path.dirname(target), { recursive: true });
-      writeFileSync(target, result.images[i]!);
+      await atomicWriteFile(target, result.images[i]!, { overwrite: force });
       logVerbose(ctx.verbose, ctx.quiet, `Writing ${target}`);
     }
 
@@ -168,7 +169,7 @@ async function runLocalConvert(
     browser: executablePath ? { executablePath } : undefined,
   });
 
-  writeFileSync(outputPath, result.data);
+  await atomicWriteFile(outputPath, result.data, { overwrite: force });
   logVerbose(ctx.verbose, ctx.quiet, `Writing ${outputPath}`);
 
   return {
@@ -305,6 +306,11 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       '--executable-path <path>',
       'Chromium executable to use for local conversion (overrides DECKHTML_CHROMIUM_EXECUTABLE_PATH)'
     )
+    .option(
+      '--force',
+      'Overwrite an existing output file instead of refusing (default: refuse)',
+      false
+    )
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {
         return;
@@ -366,7 +372,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               localViewport,
               format,
               platform,
-              options.executablePath
+              options.executablePath,
+              options.force
             );
           }
 
@@ -387,7 +394,9 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
                   : {}),
               durationMs: Date.now() - startedAt,
             });
-            writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+            await atomicWriteFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
+              overwrite: options.force,
+            });
             envelope.report = reportPath;
           }
 
