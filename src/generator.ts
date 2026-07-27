@@ -410,6 +410,12 @@ export class PPTXGenerator {
             }
           }
 
+          // DH-P0-001: propagate caller-declared identity to the PPTX object name
+          // so each shape/picture/table can be looked up in the Selection Pane.
+          if (element.elementId && converted.options && typeof converted.options === 'object') {
+            (converted.options as any).objectName = element.elementId;
+          }
+
           await this.addElementToSlide(slide, converted, currentShapeIndex);
           elementIndex++;
           if (isShapeElement) shapeIndex++;

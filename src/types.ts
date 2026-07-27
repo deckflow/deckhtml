@@ -15,6 +15,8 @@ export interface ConversionOptions {
   excludeSelector?: string;
   /** Attribute name carrying a stable per-slide id (default: data-slide-id) (DH-P0-005). */
   slideIdAttribute?: string;
+  /** Attribute name carrying a stable element identity (default: data-element-id) (DH-P0-001). */
+  identityAttribute?: string;
   splitByHeight?: boolean;
   /** Auto-detect multi-slide containers in one HTML file (default true). */
   autoDetectSlides?: boolean;
@@ -52,6 +54,8 @@ export interface ConversionOptions {
 export interface ElementInfo {
   type: ElementType;
   tag: string;
+  /** Stable caller-declared identity (from data-element-id or configured attribute) (DH-P0-001). */
+  elementId?: string;
   x: number;
   y: number;
   width: number;
@@ -356,6 +360,8 @@ export interface ConversionResult {
   stats?: ConversionStats;
   /** Per-resource diagnostics collected by the resource policy (DH-P0-007). */
   resourceDiagnostics?: import('./utils/resource-policy').ResourceDiagnostic[];
+  /** Identity diagnostics (duplicates, missing) collected during inspection (DH-P0-001). */
+  identityDiagnostics?: import('./utils/diagnostics').Diagnostic[];
 }
 
 // Style enhancement types

@@ -47,6 +47,10 @@ export interface InspectElementsOptions {
   excludeSelector?: string;
   /** Attribute name carrying a stable per-slide id (DH-P0-005). */
   slideIdAttribute?: string;
+  /** Attribute name carrying a stable element identity (default: data-element-id) (DH-P0-001). */
+  identityAttribute?: string;
+  /** Collector for identity diagnostics (duplicates) (DH-P0-001). */
+  identityDiagnostics?: import('./utils/diagnostics').Diagnostic[];
 }
 
 const SLIDE_INDEX_ATTR = 'data-deckhtml-slide-index';
@@ -1190,11 +1194,33 @@ export class ElementInspector {
   ): Promise<ElementInfo[]> {
     const inputIsSvg = options?.inputIsSvg ?? false;
     const elements = await this.page.evaluate(
-      async ({ slideSelector, slideHeight, inputIsSvg, excludeSelector, slideIdAttribute }) => {
+      async ({ slideSelector, slideHeight, inputIsSvg, excludeSelector, slideIdAttribute, identityAttribute }) => {
         const result: any[] = [];
         const _debugInfo: string[] = [];
         const _excludedCount = { value: 0 };
         const _excludedSamples: string[] = [];
+        const _identityWarnings: string[] = [];
+        const _seenElementIds = new Map<string, number>();
+        const _identityAttr = identityAttribute || 'data-element-id';
+
+        /** Read a stable caller-declared identity from an element (DH-P0-001). */
+        function readElementIdentity(element: Element): string | undefined {
+          if (!(element instanceof Element)) return undefined;
+          const v = element.getAttribute(_identityAttr);
+          if (!v) return undefined;
+          const id = v.trim();
+          if (!id) return undefined;
+          const prev = _seenElementIds.get(id);
+          if (prev !== undefined) {
+            _identityWarnings.push(
+              `Duplicate element identity "${id}" (used ${prev + 1} times) — PPTX object names will collide.`,
+            );
+            _seenElementIds.set(id, prev + 1);
+          } else {
+            _seenElementIds.set(id, 1);
+          }
+          return id;
+        }
         /**
          * Check if element is a Font Awesome icon (helper for visibility check)
          */
@@ -1289,6 +1315,7 @@ export class ElementInspector {
               const info: any = {
                 type: 'image',
                 tag: 'svg',
+                elementId: readElementIdentity(svgEl),
                 ...layout,
                 styles,
               };
@@ -5136,6 +5163,7 @@ export class ElementInspector {
           const info: any = {
             type,
             tag: tagWithMeta,
+            elementId: readElementIdentity(element),
             x: textRect.left,
             y: textRect.top,
             width: textRect.width,
@@ -5610,7 +5638,7 @@ export class ElementInspector {
 
         // Keep raw viewport coordinates. Do not normalize by inner slide/container size.
 
-        result.push({ _debugInfo, _excludedCount: _excludedCount.value, _excludedSamples });
+        result.push({ _debugInfo, _excludedCount: _excludedCount.value, _excludedSamples, _identityWarnings });
         return result;
       },
       {
@@ -5619,6 +5647,7 @@ export class ElementInspector {
         inputIsSvg,
         excludeSelector: options?.excludeSelector,
         slideIdAttribute: options?.slideIdAttribute,
+        identityAttribute: options?.identityAttribute,
       }
     );
 
@@ -5627,10 +5656,12 @@ export class ElementInspector {
     let _debugInfo: string[] = [];
     let excludedCount = 0;
     let excludedSamples: string[] = [];
+    let identityWarnings: string[] = [];
     if (lastElement && (lastElement as any)._debugInfo) {
       _debugInfo = (lastElement as any)._debugInfo;
       excludedCount = (lastElement as any)._excludedCount ?? 0;
       excludedSamples = (lastElement as any)._excludedSamples ?? [];
+      identityWarnings = (lastElement as any)._identityWarnings ?? [];
       elements.pop(); // Remove the debug info object from the elements array
     }
 
@@ -5642,6 +5673,21 @@ export class ElementInspector {
         `🚫 Excluded ${excludedCount} runtime/navigation element(s) via excludeSelector or data-pptx-kind=ignore: ` +
           excludedSamples.join(', '),
       );
+    }
+    for (const msg of identityWarnings) {
+      console.warn(`⚠️  ${msg}`);
+      // Also push a structured diagnostic so callers can branch on rule_id (DH-P0-001/009).
+      if (options?.identityDiagnostics) {
+        const dupMatch = msg.match(/Duplicate element identity "([^"]+)"/);
+        if (dupMatch) {
+          options.identityDiagnostics.push({
+            rule_id: 'DECKHTML_IDENTITY_DUPLICATE',
+            severity: 'warning',
+            element_id: dupMatch[1]!,
+            message: msg,
+          });
+        }
+      }
     }
 
     for (const el of elements as ElementInfo[]) {

@@ -47,6 +47,7 @@ export interface ConvertOptions {
   report?: boolean;
   executablePath?: string;
   exclude?: string;
+  identityAttribute?: string;
   force?: boolean;
 }
 
@@ -93,7 +94,8 @@ async function runLocalConvert(
   platform: PlatformTarget,
   executablePath?: string,
   force?: boolean,
-  excludeSelector?: string
+  excludeSelector?: string,
+  identityAttribute?: string
 ): Promise<ConversionResultEnvelope> {
   if (format === 'png') {
     logVerbose(
@@ -114,6 +116,7 @@ async function runLocalConvert(
       allowLocalResources: true,
       quiet: ctx.quiet,
       excludeSelector,
+      identityAttribute,
       browser: executablePath ? { executablePath } : undefined,
     });
 
@@ -170,6 +173,7 @@ async function runLocalConvert(
     quiet: ctx.quiet,
     platform,
     excludeSelector,
+    identityAttribute,
     browser: executablePath ? { executablePath } : undefined,
   });
 
@@ -315,6 +319,10 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       'CSS selector matching runtime/navigation elements to exclude from conversion'
     )
     .option(
+      '--identity-attribute <name>',
+      'Attribute carrying a stable element identity (default: data-element-id)'
+    )
+    .option(
       '--force',
       'Overwrite an existing output file instead of refusing (default: refuse)',
       false
@@ -382,7 +390,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               platform,
               options.executablePath,
               options.force,
-              options.exclude
+              options.exclude,
+              options.identityAttribute
             );
           }
 

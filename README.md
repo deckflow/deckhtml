@@ -139,6 +139,7 @@ Credentials are stored locally at `~/.deckflow/credentials`.
 | `--embed-fonts` | Embed fonts (cloud only) | `false` |
 | `--executable-path <path>` | Chromium binary for local conversion (else `DECKHTML_CHROMIUM_EXECUTABLE_PATH` env, then Playwright's bundle) | — |
 | `--exclude <selector>` | CSS selector matching runtime/navigation elements to exclude | — |
+| `--identity-attribute <name>` | Attribute carrying a stable element identity (default: `data-element-id`) | `data-element-id` |
 | `--force` | Overwrite an existing output file (default: refuse) | `false` |
 
 `--quiet` and `--verbose` cannot be used together. Output format is inferred from the `-o` extension (`pptx` or `png`).
