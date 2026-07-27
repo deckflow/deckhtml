@@ -182,7 +182,8 @@ async function processSingleInput(
   options: ConversionOptions,
   platformFontContext: PlatformFontContext | undefined,
   usedFontsMap: Map<string, UsedFontDescriptor>,
-  runtime?: ProcessSingleInputRuntime
+  runtime?: ProcessSingleInputRuntime,
+  diagnostics?: import('./utils/resource-policy').ResourceDiagnostic[]
 ): Promise<ProcessSingleInputResult> {
   const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
   const viewport = resolveViewportForInput(inputPath, options);
@@ -193,6 +194,8 @@ async function processSingleInput(
     viewport,
     {
       allowLocalResources: options.allowLocalResources,
+      resourcePolicy: options.resourcePolicy,
+      diagnostics,
     }
   );
 
@@ -257,6 +260,8 @@ async function processSingleInput(
           inputPath,
           viewport,
           allowLocalResources: options.allowLocalResources,
+          resourcePolicy: options.resourcePolicy,
+          diagnostics,
           slideSelector: options.slideSelector,
           autoDetectSlides: autoDetect,
           discovery: discovered,
@@ -364,6 +369,7 @@ export async function inspectHtmlFonts(
     const mergedSlidesMap = new Map<number, ElementInfo[]>();
     const usedFontsMap = new Map<string, UsedFontDescriptor>();
     let slideCoordsNormalized = false;
+    const resourceDiagnostics: import('./utils/resource-policy').ResourceDiagnostic[] = [];
 
     await loader.init(
       {
@@ -387,7 +393,9 @@ export async function inspectHtmlFonts(
           inputPath,
           options,
           platformFontContext,
-          usedFontsMap
+          usedFontsMap,
+          undefined,
+          resourceDiagnostics
         );
         slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
         slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
@@ -427,6 +435,7 @@ export async function convertHtmlToPptx(
     const mergedSlidesMap = new Map<number, ElementInfo[]>();
     const usedFontsMap = new Map<string, UsedFontDescriptor>();
     let slideCoordsNormalized = false;
+    const resourceDiagnostics: import('./utils/resource-policy').ResourceDiagnostic[] = [];
 
     await loader.init(
       {
@@ -476,7 +485,8 @@ export async function convertHtmlToPptx(
             options,
             platformFontContext,
             usedFontsMap,
-            { slideInspectConcurrency: 1 }
+            { slideInspectConcurrency: 1 },
+            resourceDiagnostics
           );
           return { index, result };
         } finally {
@@ -504,7 +514,9 @@ export async function convertHtmlToPptx(
         inputPath,
         options,
         platformFontContext,
-        usedFontsMap
+        usedFontsMap,
+        undefined,
+        resourceDiagnostics
       );
       slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
       slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
@@ -539,6 +551,7 @@ export async function convertHtmlToPptx(
       fonts: fontStats,
       simplified: buildSimplifiedStats(mergedSlidesMap),
     },
+    resourceDiagnostics,
   };
   });
 }

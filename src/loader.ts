@@ -196,7 +196,7 @@ export class HTMLLoader {
   async loadHTML(
     inputPath: string,
     viewport?: { width: number; height: number },
-    options?: { allowLocalResources?: boolean }
+    options?: { allowLocalResources?: boolean; resourcePolicy?: import('./utils/resource-policy').ResourcePolicy; diagnostics?: import('./utils/resource-policy').ResourceDiagnostic[] }
   ): Promise<Page> {
     if (!this.browser) {
       throw new Error('Browser not initialized. Call init() first.');
@@ -213,7 +213,7 @@ export class HTMLLoader {
   async loadHTMLInNewPage(
     inputPath: string,
     viewport?: { width: number; height: number },
-    options?: { allowLocalResources?: boolean }
+    options?: { allowLocalResources?: boolean; resourcePolicy?: import('./utils/resource-policy').ResourcePolicy; diagnostics?: import('./utils/resource-policy').ResourceDiagnostic[] }
   ): Promise<Page> {
     if (!this.browser) {
       throw new Error('Browser not initialized. Call init() first.');
@@ -228,7 +228,7 @@ export class HTMLLoader {
     page: Page,
     inputPath: string,
     viewport?: { width: number; height: number },
-    options?: { allowLocalResources?: boolean }
+    options?: { allowLocalResources?: boolean; resourcePolicy?: import('./utils/resource-policy').ResourcePolicy; diagnostics?: import('./utils/resource-policy').ResourceDiagnostic[] }
   ): Promise<void> {
     const w = viewport?.width ?? getSlideWidthPx();
     const h = viewport?.height ?? getSlideHeightPx();
@@ -236,6 +236,8 @@ export class HTMLLoader {
 
     const { documentUrl } = await setupResourcePolicyOnPage(page, inputPath, {
       allowLocalResources: options?.allowLocalResources,
+      policy: options?.resourcePolicy,
+      diagnostics: options?.diagnostics,
     });
 
     // Match prior slide-isolation settle (entrance animations / delayed reveals).

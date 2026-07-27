@@ -20,6 +20,11 @@ export interface ConversionOptions {
   viewportHeight?: number;
   /** Allow loading local file:// subresources in Playwright (default: false). */
   allowLocalResources?: boolean;
+  /**
+   * Explicit network/local resource policy (DH-P0-007). Takes precedence over
+   * allowLocalResources when present.
+   */
+  resourcePolicy?: import('./utils/resource-policy').ResourcePolicy;
   /** Target PPTX platform for generic font mapping; script/lang is auto-detected from text. */
   platform?: PlatformTarget;
   /** Suppress non-essential console.log / console.warn output. */
@@ -345,6 +350,8 @@ export interface ConversionResult {
   usedFonts?: string[];
   /** Element and font statistics collected during conversion */
   stats?: ConversionStats;
+  /** Per-resource diagnostics collected by the resource policy (DH-P0-007). */
+  resourceDiagnostics?: import('./utils/resource-policy').ResourceDiagnostic[];
 }
 
 // Style enhancement types

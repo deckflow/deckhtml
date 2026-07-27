@@ -11,6 +11,8 @@ export interface InspectSlidesParallelParams {
   inputPath: string;
   viewport: { width: number; height: number };
   allowLocalResources?: boolean;
+  resourcePolicy?: import('./utils/resource-policy').ResourcePolicy;
+  diagnostics?: import('./utils/resource-policy').ResourceDiagnostic[];
   slideSelector?: string;
   autoDetectSlides: boolean;
   discovery: SlideContainerDiscovery;
@@ -29,6 +31,8 @@ export async function inspectSlidesParallel(
   const indices = Array.from({ length: params.discovery.count }, (_, i) => i);
   const loadOptions = {
     allowLocalResources: params.allowLocalResources,
+    resourcePolicy: params.resourcePolicy,
+    diagnostics: params.diagnostics,
   };
 
   await runAsyncPool(indices, params.concurrency, async (slideIndex) => {
