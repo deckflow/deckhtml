@@ -33,6 +33,7 @@ import { buildPlatformFontContext, PlatformFontContext } from './utils/platformF
 import { runQuietly } from './utils/quiet';
 import { embedFontAwesomeFonts } from './utils/fa-font-embedder';
 import { buildElementStats, buildFontStats, buildSimplifiedStats } from './conversion-report';
+import { DiagnosticsCollector } from './utils/diagnostics';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -587,6 +588,19 @@ export async function convertHtmlToPptx(
 
   reportUsedFonts(usedFontsDeduped, fontStats);
 
+  // Aggregate unified diagnostics (DH-P0-009): identity + resource + report-level.
+  const unifiedDiagnostics = new DiagnosticsCollector();
+  unifiedDiagnostics.pushMany(identityDiagnostics);
+  for (const d of resourceDiagnostics) {
+    unifiedDiagnostics.push({
+      rule_id: d.rule_id,
+      severity: d.severity,
+      message: d.message,
+      recovery: d.recovery,
+    });
+  }
+  unifiedDiagnostics.pushMany(conversionReport.diagnostics ?? []);
+
   return {
     data: dataWithFaFonts,
     usedFonts: usedFontsDeduped,
@@ -598,6 +612,7 @@ export async function convertHtmlToPptx(
     },
     resourceDiagnostics,
     identityDiagnostics,
+    diagnostics: unifiedDiagnostics.toJSON(),
     report: conversionReport,
   };
   });

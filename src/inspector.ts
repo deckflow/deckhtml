@@ -1202,6 +1202,7 @@ export class ElementInspector {
         const _excludedCount = { value: 0 };
         const _excludedSamples: string[] = [];
         const _identityWarnings: string[] = [];
+        const _kindDiagnostics: any[] = [];
         const _seenElementIds = new Map<string, number>();
         const _identityAttr = identityAttribute || 'data-element-id';
 
@@ -4688,6 +4689,24 @@ export class ElementInspector {
               _excludedCount.value++;
               return;
             }
+            // DH-P0-009: surface unknown data-pptx-kind hints as a structured
+            // diagnostic so callers can fix their decks.
+            const kindHint = element.getAttribute('data-pptx-kind');
+            if (kindHint) {
+              const known = new Set([
+                'text', 'image', 'shape', 'table', 'group', 'ignore',
+              ]);
+              const normalized = kindHint.trim().toLowerCase();
+              if (normalized && !known.has(normalized)) {
+                _kindDiagnostics.push({
+                  rule_id: 'DECKHTML_KIND_AMBIGUOUS',
+                  severity: 'warning',
+                  element_id: readElementIdentity(element) ?? null,
+                  message: `Unknown data-pptx-kind="${kindHint}" on <${element.tagName.toLowerCase()}>; falling back to tag inference.`,
+                  recovery: 'Use one of: text, image, shape, table, group, ignore.',
+                });
+              }
+            }
           }
 
           // const elementSelector = getElementSelector(element);
@@ -5657,7 +5676,7 @@ export class ElementInspector {
 
         // Keep raw viewport coordinates. Do not normalize by inner slide/container size.
 
-        result.push({ _debugInfo, _excludedCount: _excludedCount.value, _excludedSamples, _identityWarnings });
+        result.push({ _debugInfo, _excludedCount: _excludedCount.value, _excludedSamples, _identityWarnings, _kindDiagnostics });
         return result;
       },
       {
@@ -5676,11 +5695,13 @@ export class ElementInspector {
     let excludedCount = 0;
     let excludedSamples: string[] = [];
     let identityWarnings: string[] = [];
+    let kindDiagnostics: any[] = [];
     if (lastElement && (lastElement as any)._debugInfo) {
       _debugInfo = (lastElement as any)._debugInfo;
       excludedCount = (lastElement as any)._excludedCount ?? 0;
       excludedSamples = (lastElement as any)._excludedSamples ?? [];
       identityWarnings = (lastElement as any)._identityWarnings ?? [];
+      kindDiagnostics = (lastElement as any)._kindDiagnostics ?? [];
       elements.pop(); // Remove the debug info object from the elements array
     }
 
@@ -5707,6 +5728,13 @@ export class ElementInspector {
             message: msg,
           });
         }
+      }
+    }
+    // DH-P0-009: surface unknown data-pptx-kind hints as structured diagnostics.
+    if (options?.identityDiagnostics) {
+      for (const d of kindDiagnostics) {
+        console.warn(`⚠️  ${d.message}`);
+        options.identityDiagnostics.push(d);
       }
     }
 
