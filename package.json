@@ -43,19 +43,19 @@
   "license": "MIT",
   "dependencies": {
     "@deckops/sdk": "^0.7.2",
+    "chrome-launcher": "^1.2.1",
     "commander": "^11.1.0",
     "jszip": "^3.10.1",
     "mathml2omml": "^0.5.0",
-    "open": "^11.0.0"
+    "open": "^11.0.0",
+    "playwright-core": "^1.62.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "playwright-core": "^1.58.1",
     "pptxgenjs": "^4.0.1",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "playwright-core": "^1.58.1",
     "pptxgenjs": "^4.0.1"
   }
 }

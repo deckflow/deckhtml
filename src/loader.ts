@@ -3,8 +3,11 @@
  * Uses Playwright to load and render HTML files.
  *
  * Browser launch is fully caller-controlled (DH-P0-006):
- *   - `executablePath` (option or DECKHTML_CHROMIUM_EXECUTABLE_PATH env) selects the
- *     Chromium binary; falls back to Playwright's bundled build.
+ *   - `executablePath` resolution order:
+ *       1. explicit `executablePath` option
+ *       2. `DECKHTML_CHROMIUM_EXECUTABLE_PATH` env
+ *       3. Playwright's bundled Chromium (from `npx playwright-core install chromium`)
+ *       4. system Chrome / Edge discovered via `chrome-launcher`
  *   - `userDataDir` (option or DECKHTML_BROWSER_DATA_DIR env) opts into a persistent
  *     profile. By default a fresh temp directory is created per process and removed
  *     on exit — the loader never writes to ~/browser-data unless asked to.
@@ -23,7 +26,7 @@ import { gotoAndSettle } from './utils/navigate';
 
 /** Caller-controlled browser launch options. */
 export interface BrowserLaunchOptions {
-  /** Explicit Chromium executable path. Defaults to DECKHTML_CHROMIUM_EXECUTABLE_PATH env, then Playwright's bundle. */
+  /** Explicit Chromium executable path. Resolution order: option → DECKHTML_CHROMIUM_EXECUTABLE_PATH → Playwright bundle → system Chrome via chrome-launcher. */
   executablePath?: string;
   /** Persistent profile directory. Defaults to DECKHTML_BROWSER_DATA_DIR env, then a per-process temp dir. */
   userDataDir?: string;
@@ -76,8 +79,50 @@ async function cleanupOwnedBrowser(): Promise<void> {
   }
 }
 
-function resolveExecutablePath(option?: string): string | undefined {
-  return option ?? ENV_EXECUTABLE_PATH ?? undefined;
+// chrome-launcher is shipped as an ESM-only package, so it must be loaded via a
+// dynamic `import()`. Cache the resolved module to avoid repeated async imports.
+// We only need the `getFirstInstallation()` static method, so type it minimally to
+// avoid pulling ESM types into this CommonJS module.
+interface ChromeLauncherStatic {
+  getFirstInstallation(): string | undefined;
+}
+
+let chromeLauncherCache: Promise<ChromeLauncherStatic | null> | null = null;
+
+function loadChromeLauncher(): Promise<ChromeLauncherStatic | null> {
+  if (!chromeLauncherCache) {
+    chromeLauncherCache = import('chrome-launcher')
+      .then((mod: { Launcher?: ChromeLauncherStatic }) => mod.Launcher ?? null)
+      .catch(() => null);
+  }
+  return chromeLauncherCache;
+}
+
+async function resolveExecutablePath(option?: string): Promise<string | undefined> {
+  // 1. Explicit caller option.
+  if (option) return option;
+  // 2. Environment override.
+  if (ENV_EXECUTABLE_PATH) return ENV_EXECUTABLE_PATH;
+  // 3. Playwright-core's bundled Chromium (installed via `npx playwright-core install chromium`).
+  //    `chromium.executablePath()` may throw when the bundle is absent, and may return a
+  //    path that doesn't exist on disk — guard both.
+  try {
+    const bundled = chromium.executablePath();
+    if (bundled && fs.existsSync(bundled)) return bundled;
+  } catch {
+    // Bundle not installed; fall through to system Chrome discovery.
+  }
+  // 4. System-installed Chrome / Edge via chrome-launcher.
+  const Launcher = await loadChromeLauncher();
+  if (Launcher) {
+    try {
+      const systemChrome = Launcher.getFirstInstallation();
+      if (systemChrome) return systemChrome;
+    } catch {
+      // chrome-launcher found no installation.
+    }
+  }
+  return undefined;
 }
 
 function resolveUserDataDir(option?: string): string | undefined {
@@ -136,7 +181,7 @@ export class HTMLLoader {
       return;
     }
 
-    const executablePath = resolveExecutablePath(launchOptions?.executablePath);
+    const executablePath = await resolveExecutablePath(launchOptions?.executablePath);
     const userDataDirOption = resolveUserDataDir(launchOptions?.userDataDir);
     const headless = launchOptions?.headless ?? true;
     const extraArgs = launchOptions?.args ?? [];
@@ -185,7 +230,16 @@ export class HTMLLoader {
         `Failed to launch Chromium for HTML inspection: ${message}`,
         executablePath
           ? `Verify executablePath "${executablePath}" is a valid Chromium binary.`
-          : `Install Playwright browsers (npx playwright-core install chromium) or set DECKHTML_CHROMIUM_EXECUTABLE_PATH to an existing Chromium.`,
+          : [
+              'No usable Chromium/Chrome was found. To fix this, choose one of:',
+              '  • Install Playwright\'s bundled Chromium:',
+              '      npx playwright-core install chromium',
+              '  • Or install Google Chrome / Microsoft Edge on this machine and retry.',
+              '  • Or point to an existing Chromium binary:',
+              '      export DECKHTML_CHROMIUM_EXECUTABLE_PATH=/path/to/chrome',
+              '  • Or skip local rendering and use the cloud:',
+              '      deckhtml convert --mode cloud <input.html>',
+            ].join('\n'),
       );
     }
   }
