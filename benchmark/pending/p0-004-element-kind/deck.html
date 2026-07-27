@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>P0-004 explicit element kind</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  .card { background: #f5f5f5; border: 1px solid #ccc; padding: 12px; }
+  .pill { display: inline-block; background: #2563eb; color: white; padding: 4px 10px; border-radius: 999px; }
+</style>
+</head>
+<body>
+  <h1 data-element-id="title" data-pptx-kind="text">Kind Text</h1>
+  <div data-element-id="card" data-pptx-kind="shape" class="card">
+    <span data-element-id="card-label">Card label</span>
+  </div>
+  <span data-element-id="pill" data-pptx-kind="shape" class="pill">Pill</span>
+  <div data-element-id="ignored" data-pptx-kind="ignore">
+    <span>This whole subtree must be ignored</span>
+  </div>
+  <div data-element-id="group" data-pptx-kind="group">
+    <p data-element-id="group-a">Group child A</p>
+    <p data-element-id="group-b">Group child B</p>
+  </div>
+</body>
+</html>

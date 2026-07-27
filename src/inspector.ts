@@ -3211,6 +3211,23 @@ export class ElementInspector {
         function getElementType(element: Element): string {
           const tag = element.tagName.toLowerCase();
 
+          // DH-P0-004: explicit element kind hint takes precedence over tag/style inference.
+          // `ignore` is handled in processElement (skips the subtree); here we map the rest.
+          if (element instanceof Element) {
+            const hint = element.getAttribute('data-pptx-kind');
+            if (hint) {
+              const kind = hint.trim().toLowerCase();
+              if (kind === 'text') return 'text';
+              if (kind === 'image') return 'image';
+              if (kind === 'shape') return 'shape';
+              if (kind === 'table') return 'table';
+              if (kind === 'group') return 'container';
+              // 'ignore' is consumed before getElementType runs, but defend in depth.
+              if (kind === 'ignore') return 'container';
+              // Unknown hint: fall through to inference (reported as ambiguous later).
+            }
+          }
+
           if (tag === 'img') return 'image';
           if (tag === 'video') return 'video';
           if (tag === 'audio') return 'audio';
