@@ -50,12 +50,12 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "playwright": "^1.58.1",
+    "playwright-core": "^1.58.1",
     "pptxgenjs": "^4.0.1",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "playwright": "^1.58.1",
+    "playwright-core": "^1.58.1",
     "pptxgenjs": "^4.0.1"
   }
 }

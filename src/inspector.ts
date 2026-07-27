@@ -3,7 +3,7 @@
  * Traverses DOM tree and extracts element information
  */
 
-import { Page } from 'playwright';
+import { Page } from 'playwright-core';
 import { ElementInfo, ElementType, ComputedStyles, TableData } from './types';
 import { getSlideHeightPx, getSlideWidthPx } from './utils/coordinate';
 import { convertMathmlToOmml } from './utils/mathml-to-omml';

@@ -9,7 +9,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-import type { Page, Route } from 'playwright';
+import type { Page, Route } from 'playwright-core';
 
 /** Timeout for remote media probe/download used before pptxgenjs embed. */
 const REMOTE_MEDIA_TIMEOUT_MS = 30_000;

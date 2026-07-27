@@ -85,4 +85,4 @@ deckhtml config set retention-hours 3
 
 ## Peer dependencies (local)
 
-Local conversion needs `playwright` and `pptxgenjs` available (declared as peerDependencies of `@deckflow/deckhtml`).
+Local conversion needs `playwright-core` and `pptxgenjs` available (declared as peerDependencies of `@deckflow/deckhtml`).

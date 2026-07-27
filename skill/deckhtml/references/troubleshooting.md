@@ -4,7 +4,7 @@
 
 | Error / symptom | Fix |
 | --- | --- |
-| `playwright` / browser missing | `npx playwright install chromium` in the environment that runs local mode |
+| `playwright-core` / browser missing | `npx playwright-core install chromium` in the environment that runs local mode |
 | `pptxgenjs` missing | Install peer dep next to `@deckflow/deckhtml` |
 | `--output is required when reading HTML from stdin` | Pass `-o out.pptx` |
 | Cloud-only flag with local mode | Drop flag or use `--mode cloud` + API key |

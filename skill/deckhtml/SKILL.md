@@ -162,7 +162,7 @@ const result = await convertHtmlToPptx({
 writeFileSync('deck.pptx', result.data);
 ```
 
-Requires peer deps: `playwright`, `pptxgenjs`. Local API is PPTX-only.
+Requires peer deps: `playwright-core`, `pptxgenjs`. Local API is PPTX-only.
 
 ## Do / Don't
 

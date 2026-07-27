@@ -2,7 +2,7 @@
  * HTML → PNG export via Playwright viewport screenshots.
  */
 
-import type { Page } from 'playwright';
+import type { Page } from 'playwright-core';
 import { HTMLLoader } from './loader';
 import {
   ElementInspector,

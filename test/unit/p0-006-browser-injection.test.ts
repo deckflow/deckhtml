@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it, after } from 'node:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Browser } from 'playwright';
+import { chromium, type Browser } from 'playwright-core';
 import { convertHtmlToPptx } from '../../dist/api.js';
 import {
   HTMLLoader,
@@ -83,12 +83,12 @@ describe('DH-P0-006 controlled browser injection', () => {
     // persistent profile creation).
     const loader1 = new HTMLLoader();
     await loader1.init({ headless: true });
-    const ctx1 = (loader1 as unknown as { browser: import('playwright').BrowserContext }).browser;
+    const ctx1 = (loader1 as unknown as { browser: import('playwright-core').BrowserContext }).browser;
     await loader1.close();
 
     const loader2 = new HTMLLoader();
     await loader2.init({ headless: true });
-    const ctx2 = (loader2 as unknown as { browser: import('playwright').BrowserContext }).browser;
+    const ctx2 = (loader2 as unknown as { browser: import('playwright-core').BrowserContext }).browser;
     await loader2.close();
 
     assert.ok(ctx1 && ctx2, 'contexts not initialised');

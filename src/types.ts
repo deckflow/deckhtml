@@ -46,8 +46,8 @@ export interface ConversionOptions {
     userDataDir?: string;
     headless?: boolean;
     args?: string[];
-    browser?: import('playwright').Browser;
-    browserContext?: import('playwright').BrowserContext;
+    browser?: import('playwright-core').Browser;
+    browserContext?: import('playwright-core').BrowserContext;
   };
   /**
    * Strict-mode gates (DH-P0-003). When `strict` is present the conversion

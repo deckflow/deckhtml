@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import { chromium, Browser, Page, BrowserContext } from 'playwright-core';
 import { getSlideWidthPx, getSlideHeightPx } from './utils/coordinate';
 import { setupResourcePolicyOnPage } from './utils/resource-policy';
 import { gotoAndSettle } from './utils/navigate';
@@ -185,7 +185,7 @@ export class HTMLLoader {
         `Failed to launch Chromium for HTML inspection: ${message}`,
         executablePath
           ? `Verify executablePath "${executablePath}" is a valid Chromium binary.`
-          : `Install Playwright browsers (npx playwright install chromium) or set DECKHTML_CHROMIUM_EXECUTABLE_PATH to an existing Chromium.`,
+          : `Install Playwright browsers (npx playwright-core install chromium) or set DECKHTML_CHROMIUM_EXECUTABLE_PATH to an existing Chromium.`,
       );
     }
   }

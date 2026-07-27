@@ -3,7 +3,7 @@
  * Avoid hard-failing on hung CDN / image requests (networkidle never settles).
  */
 
-import type { Page } from 'playwright';
+import type { Page } from 'playwright-core';
 
 export interface GotoAndSettleOptions {
   /** Timeout for document navigation (domcontentloaded). Default 30s. */
