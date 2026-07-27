@@ -137,6 +137,7 @@ Credentials are stored locally at `~/.deckflow/credentials`.
 | `--width <pixels>` | Playwright viewport width (height scales at 16:9) | `1920` |
 | `--platform <platform>` | `win`, `mac`, `ios`, `android`, or `linux` | Detected |
 | `--embed-fonts` | Embed fonts (cloud only) | `false` |
+| `--executable-path <path>` | Chromium binary for local conversion (else `DECKHTML_CHROMIUM_EXECUTABLE_PATH` env, then Playwright's bundle) | — |
 
 `--quiet` and `--verbose` cannot be used together. Output format is inferred from the `-o` extension (`pptx` or `png`).
 

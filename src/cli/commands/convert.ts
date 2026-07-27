@@ -45,6 +45,7 @@ export interface ConvertOptions {
   platform?: string;
   embedFonts?: boolean;
   report?: boolean;
+  executablePath?: string;
 }
 
 function resolvePlatformOption(platform?: string): PlatformTarget {
@@ -87,7 +88,8 @@ async function runLocalConvert(
   outputPath: string,
   viewport: { width: number; height: number },
   format: string,
-  platform: PlatformTarget
+  platform: PlatformTarget,
+  executablePath?: string
 ): Promise<ConversionResultEnvelope> {
   if (format === 'png') {
     logVerbose(
@@ -107,6 +109,7 @@ async function runLocalConvert(
       viewportHeight: viewport.height,
       allowLocalResources: true,
       quiet: ctx.quiet,
+      browser: executablePath ? { executablePath } : undefined,
     });
 
     const outputPaths = buildPngOutputPaths(outputPath, result.images.length);
@@ -162,6 +165,7 @@ async function runLocalConvert(
     allowLocalResources: true,
     quiet: ctx.quiet,
     platform,
+    browser: executablePath ? { executablePath } : undefined,
   });
 
   writeFileSync(outputPath, result.data);
@@ -297,6 +301,10 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     )
     .option('--embed-fonts', 'Embed fonts (cloud only)', false)
     .option('--report', 'Generate conversion report next to output', false)
+    .option(
+      '--executable-path <path>',
+      'Chromium executable to use for local conversion (overrides DECKHTML_CHROMIUM_EXECUTABLE_PATH)'
+    )
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {
         return;
@@ -357,7 +365,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               outputPath,
               localViewport,
               format,
-              platform
+              platform,
+              options.executablePath
             );
           }
 

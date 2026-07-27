@@ -203,7 +203,18 @@ export async function convertHtmlToPng(
             );
           }
           const fileLoader = new HTMLLoader();
-          await fileLoader.init();
+          await fileLoader.init(
+            {
+              executablePath: options.browser?.executablePath,
+              userDataDir: options.browser?.userDataDir,
+              headless: options.browser?.headless,
+              args: options.browser?.args,
+            },
+            {
+              browser: options.browser?.browser,
+              browserContext: options.browser?.browserContext,
+            },
+          );
           try {
             const pages = await exportSingleInputToPng(fileLoader, path, options);
             return { index, pages };
@@ -217,7 +228,18 @@ export async function convertHtmlToPng(
       images = completed.flatMap(({ pages }) => pages);
     } else {
       const loader = new HTMLLoader();
-      await loader.init();
+      await loader.init(
+        {
+          executablePath: options.browser?.executablePath,
+          userDataDir: options.browser?.userDataDir,
+          headless: options.browser?.headless,
+          args: options.browser?.args,
+        },
+        {
+          browser: options.browser?.browser,
+          browserContext: options.browser?.browserContext,
+        },
+      );
       try {
         images = [];
         for (let i = 0; i < inputPaths.length; i++) {

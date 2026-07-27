@@ -24,6 +24,20 @@ export interface ConversionOptions {
   platform?: PlatformTarget;
   /** Suppress non-essential console.log / console.warn output. */
   quiet?: boolean;
+  /**
+   * Caller-controlled browser launch / injection (DH-P0-006).
+   * Pass `executablePath` to reuse a host Chromium, `userDataDir` for a persistent
+   * profile (defaults to a per-process temp dir), or `browser`/`browserContext` to
+   * inject an existing Playwright instance the loader will not close.
+   */
+  browser?: {
+    executablePath?: string;
+    userDataDir?: string;
+    headless?: boolean;
+    args?: string[];
+    browser?: import('playwright').Browser;
+    browserContext?: import('playwright').BrowserContext;
+  };
 }
 
 export interface ElementInfo {

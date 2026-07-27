@@ -365,7 +365,18 @@ export async function inspectHtmlFonts(
     const usedFontsMap = new Map<string, UsedFontDescriptor>();
     let slideCoordsNormalized = false;
 
-    await loader.init();
+    await loader.init(
+      {
+        executablePath: options.browser?.executablePath,
+        userDataDir: options.browser?.userDataDir,
+        headless: options.browser?.headless,
+        args: options.browser?.args,
+      },
+      {
+        browser: options.browser?.browser,
+        browserContext: options.browser?.browserContext,
+      },
+    );
 
     try {
       let slideOffset = 0;
@@ -410,14 +421,25 @@ export async function convertHtmlToPptx(
   options: ConversionOptions
 ): Promise<ConversionResult> {
   return runQuietly(Boolean(options.quiet), async () => {
-  const inputPaths = resolveInputPaths(options);
-  const platformFontContext = buildPlatformFontContext(options);
-  const loader = new HTMLLoader();
-  const mergedSlidesMap = new Map<number, ElementInfo[]>();
-  const usedFontsMap = new Map<string, UsedFontDescriptor>();
-  let slideCoordsNormalized = false;
+    const inputPaths = resolveInputPaths(options);
+    const platformFontContext = buildPlatformFontContext(options);
+    const loader = new HTMLLoader();
+    const mergedSlidesMap = new Map<number, ElementInfo[]>();
+    const usedFontsMap = new Map<string, UsedFontDescriptor>();
+    let slideCoordsNormalized = false;
 
-  await loader.init();
+    await loader.init(
+      {
+        executablePath: options.browser?.executablePath,
+        userDataDir: options.browser?.userDataDir,
+        headless: options.browser?.headless,
+        args: options.browser?.args,
+      },
+      {
+        browser: options.browser?.browser,
+        browserContext: options.browser?.browserContext,
+      },
+    );
 
   const inspectConcurrency = resolveSlideInspectConcurrency();
   const parallelInputs = inputPaths.length > 1 && inspectConcurrency > 1;
@@ -435,7 +457,18 @@ export async function convertHtmlToPptx(
       async ({ path, index }) => {
         console.log(`\n📄 Processing ${index + 1}/${inputPaths.length}: ${path}`);
         const fileLoader = new HTMLLoader();
-        await fileLoader.init();
+        await fileLoader.init(
+          {
+            executablePath: options.browser?.executablePath,
+            userDataDir: options.browser?.userDataDir,
+            headless: options.browser?.headless,
+            args: options.browser?.args,
+          },
+          {
+            browser: options.browser?.browser,
+            browserContext: options.browser?.browserContext,
+          },
+        );
         try {
           const result = await processSingleInput(
             fileLoader,
