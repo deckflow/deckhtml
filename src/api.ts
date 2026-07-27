@@ -34,6 +34,7 @@ import { runQuietly } from './utils/quiet';
 import { embedFontAwesomeFonts } from './utils/fa-font-embedder';
 import { buildElementStats, buildFontStats, buildSimplifiedStats, recomputeSummary } from './conversion-report';
 import { DiagnosticsCollector, ConversionError, RULE_IDS, type Diagnostic } from './utils/diagnostics';
+import { verifyOoxml } from './utils/ooxml-verify';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -778,6 +779,23 @@ export async function convertHtmlToPptx(
   }
   unifiedDiagnostics.pushMany(conversionReport.diagnostics ?? []);
 
+  // DH-P0-010: OOXML self-check — reopen the generated package and verify
+  // slide count, object_ref closure, full-page image and remote relationships.
+  // Always run the check (cheap) and surface diagnostics; strict mode hard-fails.
+  let ooxmlDiagnostics: Diagnostic[] = [];
+  try {
+    const verification = await verifyOoxml(dataWithFaFonts, conversionReport);
+    ooxmlDiagnostics = verification.diagnostics;
+    unifiedDiagnostics.pushMany(ooxmlDiagnostics);
+  } catch (err) {
+    ooxmlDiagnostics = [{
+      rule_id: RULE_IDS.OOXML_REOPEN_FAILURE,
+      severity: 'error',
+      message: `OOXML self-check threw: ${err instanceof Error ? err.message : String(err)}`,
+    }];
+    unifiedDiagnostics.pushMany(ooxmlDiagnostics);
+  }
+
   // DH-P0-003: enforce strict-mode gates before returning a successful result.
   const strictConfig = resolveStrictConfig(options.strict);
   if (strictConfig) {
@@ -788,6 +806,11 @@ export async function convertHtmlToPptx(
       fontStats,
       identityDiagnostics,
     });
+    // DH-P0-010: in strict mode, OOXML self-check errors are hard failures.
+    const ooxmlErrors = ooxmlDiagnostics.filter((d) => d.severity === 'error');
+    if (ooxmlErrors.length > 0) {
+      throw new ConversionError(ooxmlErrors[0]!, ooxmlDiagnostics);
+    }
   }
 
   return {
