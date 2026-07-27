@@ -32,8 +32,8 @@ import {
 import { buildPlatformFontContext, PlatformFontContext } from './utils/platformFontMap';
 import { runQuietly } from './utils/quiet';
 import { embedFontAwesomeFonts } from './utils/fa-font-embedder';
-import { buildElementStats, buildFontStats, buildSimplifiedStats } from './conversion-report';
-import { DiagnosticsCollector } from './utils/diagnostics';
+import { buildElementStats, buildFontStats, buildSimplifiedStats, recomputeSummary } from './conversion-report';
+import { DiagnosticsCollector, ConversionError, RULE_IDS, type Diagnostic } from './utils/diagnostics';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -381,6 +381,183 @@ function reportUsedFonts(
 }
 
 /**
+ * Web-safe / generic system font families that are always considered available
+ * and therefore never trigger `strict.failOnMissingFonts` (DH-P0-003).
+ */
+const WEB_SAFE_FONTS = new Set([
+  'arial',
+  'helvetica',
+  'helvetica neue',
+  'times',
+  'times new roman',
+  'georgia',
+  'courier',
+  'courier new',
+  'verdana',
+  'tahoma',
+  'trebuchet ms',
+  'geneva',
+  'palatino',
+  'garamond',
+  'bookman',
+  'comic sans ms',
+  'impact',
+  'system-ui',
+  'system',
+  'sans-serif',
+  'serif',
+  'monospace',
+  'cursive',
+  'fantasy',
+  'ui-sans-serif',
+  'ui-serif',
+  'ui-monospace',
+  '-apple-system',
+  'blinkmacsystemfont',
+  'segoe ui',
+  'roboto',
+  'noto sans',
+  'noto serif',
+  'open sans',
+  'lato',
+  'montserrat',
+  'source sans pro',
+  'inter',
+]);
+
+function isWebSafeFont(family: string): boolean {
+  return WEB_SAFE_FONTS.has(family.trim().toLowerCase());
+}
+
+/**
+ * Resolve the effective strict-mode configuration (DH-P0-003).
+ *
+ * When `strict` is present, every gate defaults to its strictest value unless
+ * the caller explicitly relaxes it.
+ */
+function resolveStrictConfig(
+  strict: import('./types').StrictConversionOptions | undefined,
+): Required<import('./types').StrictConversionOptions> | null {
+  if (!strict) return null;
+  return {
+    requireElementIdentity: strict.requireElementIdentity ?? true,
+    allowRaster: strict.allowRaster ?? false,
+    allowUnsupported: strict.allowUnsupported ?? false,
+    allowRemoteResources: strict.allowRemoteResources ?? false,
+    failOnMissingFonts: strict.failOnMissingFonts ?? true,
+  };
+}
+
+/**
+ * Enforce strict-mode gates after a conversion (DH-P0-003).
+ *
+ * Throws ConversionError (carrying the offending diagnostics) when any gate is
+ * violated. Never returns a seemingly-successful PPTX for a strict run that
+ * actually degraded.
+ */
+function enforceStrictMode(args: {
+  strict: Required<import('./types').StrictConversionOptions>;
+  report: import('./conversion-report').DeckHtmlConversionReport;
+  resourceDiagnostics: import('./utils/resource-policy').ResourceDiagnostic[];
+  fontStats: import('./conversion-report').ConversionFontStats;
+  identityDiagnostics: Diagnostic[];
+}): never | void {
+  const { strict, report, resourceDiagnostics, fontStats, identityDiagnostics } = args;
+  const failures: Diagnostic[] = [];
+
+  // requireElementIdentity: every converted semantic element must declare an identity.
+  // We check the report's per-element records (the source of truth for what was
+  // actually mapped) rather than the raw inspected set, so structural containers
+  // that were ignored or never produced a PPTX object don't trigger the gate.
+  if (strict.requireElementIdentity) {
+    const missing: { slide: string | null; kind: string }[] = [];
+    for (const slide of report.slides) {
+      for (const rec of slide.elements) {
+        if (rec.mapping_mode === 'ignored') continue;
+        if (!rec.element_id) {
+          missing.push({ slide: slide.slide_id, kind: rec.kind });
+        }
+      }
+    }
+    if (missing.length > 0) {
+      failures.push({
+        rule_id: RULE_IDS.IDENTITY_MISSING,
+        severity: 'error',
+        message: `strict mode: ${missing.length} converted element(s) lack a declared identity (e.g. "${missing[0]!.kind}" on slide ${missing[0]!.slide ?? 1}). Set data-element-id on every semantic element or relax requireElementIdentity.`,
+        recovery: 'Add data-element-id to every visible semantic element, or set strict.requireElementIdentity=false.',
+      });
+    }
+  }
+
+  // allowRaster: no raster fallbacks allowed.
+  if (!strict.allowRaster) {
+    if (report.summary.raster > 0) {
+      failures.push({
+        rule_id: RULE_IDS.RASTER_FALLBACK,
+        severity: 'error',
+        message: `strict mode: ${report.summary.raster} element(s) fell back to raster. Set strict.allowRaster=true to permit raster fallbacks.`,
+        recovery: 'Replace rasterized content with native/vector equivalents, or set strict.allowRaster=true.',
+      });
+    }
+  }
+
+  // allowUnsupported: no unsupported elements allowed.
+  if (!strict.allowUnsupported) {
+    if (report.summary.unsupported > 0) {
+      failures.push({
+        rule_id: RULE_IDS.KIND_UNSUPPORTED,
+        severity: 'error',
+        message: `strict mode: ${report.summary.unsupported} element(s) are unsupported. Set strict.allowUnsupported=true to permit unsupported kinds.`,
+        recovery: 'Replace unsupported elements with text/image/shape/table/group, or set strict.allowUnsupported=true.',
+      });
+    }
+  }
+
+  // allowRemoteResources: no remote resource access allowed.
+  if (!strict.allowRemoteResources) {
+    const remoteBlocked = resourceDiagnostics.filter(
+      (d) => d.rule_id === RULE_IDS.RESOURCE_REMOTE_BLOCKED,
+    );
+    if (remoteBlocked.length > 0) {
+      failures.push({
+        rule_id: RULE_IDS.RESOURCE_REMOTE_BLOCKED,
+        severity: 'error',
+        message: `strict mode: ${remoteBlocked.length} remote resource request(s) were blocked. Set strict.allowRemoteResources=true to permit remote resources.`,
+        recovery: 'Inline remote resources locally, or set strict.allowRemoteResources=true.',
+      });
+    }
+  }
+
+  // failOnMissingFonts: no unresolved fonts allowed.
+  if (strict.failOnMissingFonts) {
+    const unmatched = (fontStats.embed?.unmatched ?? []).filter(
+      (f) => !isWebSafeFont(f),
+    );
+    if (unmatched.length > 0) {
+      failures.push({
+        rule_id: RULE_IDS.FONT_MISSING,
+        severity: 'error',
+        message: `strict mode: ${unmatched.length} font family(ies) could not be resolved: ${unmatched.join(', ')}. Set strict.failOnMissingFonts=false to permit font fallbacks.`,
+        recovery: 'Install the missing fonts, embed them via the cloud pipeline, or set strict.failOnMissingFonts=false.',
+      });
+    }
+  }
+
+  if (failures.length > 0) {
+    const additional = [
+      ...identityDiagnostics,
+      ...resourceDiagnostics.map((d) => ({
+        rule_id: d.rule_id,
+        severity: d.severity,
+        message: d.message,
+        recovery: d.recovery,
+      })),
+    ];
+    throw new ConversionError(failures[0]!, additional);
+  }
+}
+
+/**
  * Inspect HTML inputs and collect slide/element/font statistics without generating PPTX.
  */
 export async function inspectHtmlFonts(
@@ -600,6 +777,18 @@ export async function convertHtmlToPptx(
     });
   }
   unifiedDiagnostics.pushMany(conversionReport.diagnostics ?? []);
+
+  // DH-P0-003: enforce strict-mode gates before returning a successful result.
+  const strictConfig = resolveStrictConfig(options.strict);
+  if (strictConfig) {
+    enforceStrictMode({
+      strict: strictConfig,
+      report: conversionReport,
+      resourceDiagnostics,
+      fontStats,
+      identityDiagnostics,
+    });
+  }
 
   return {
     data: dataWithFaFonts,

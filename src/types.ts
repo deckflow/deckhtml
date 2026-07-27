@@ -49,6 +49,33 @@ export interface ConversionOptions {
     browser?: import('playwright').Browser;
     browserContext?: import('playwright').BrowserContext;
   };
+  /**
+   * Strict-mode gates (DH-P0-003). When `strict` is present the conversion
+   * rejects silent degradation: missing identities, raster fallbacks,
+   * unsupported elements, remote resources and missing fonts become hard
+   * failures (ConversionError) instead of warnings.
+   */
+  strict?: StrictConversionOptions;
+}
+
+/**
+ * Strict-mode configuration (DH-P0-003).
+ *
+ * All flags default to `true` when the `strict` object is present but a flag is
+ * omitted — i.e. opting into strict mode opts into the strictest behaviour
+ * unless the caller explicitly relaxes a gate.
+ */
+export interface StrictConversionOptions {
+  /** Require every visible semantic element to declare an identity (DH-P0-001). */
+  requireElementIdentity?: boolean;
+  /** Disallow raster fallbacks (full-page screenshots, rasterized elements). */
+  allowRaster?: boolean;
+  /** Disallow unsupported element kinds (text/data/reading-order-affecting). */
+  allowUnsupported?: boolean;
+  /** Disallow remote network resources during conversion. */
+  allowRemoteResources?: boolean;
+  /** Hard fail when a declared font cannot be resolved. */
+  failOnMissingFonts?: boolean;
 }
 
 export interface ElementInfo {

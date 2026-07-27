@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DH-P0-003 strict mode fixture</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      position: relative;
+      background: #fff;
+    }
+    .title {
+      position: absolute;
+      left: 80px;
+      top: 80px;
+      font-size: 48px;
+      font-weight: 700;
+    }
+    .body {
+      position: absolute;
+      left: 80px;
+      top: 220px;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide" data-pptx-kind="ignore">
+    <!-- Every visible semantic element declares an identity. -->
+    <h1 class="title" data-element-id="title">Strict Mode</h1>
+    <p class="body" data-element-id="body">All elements have identities.</p>
+  </div>
+</body>
+</html>

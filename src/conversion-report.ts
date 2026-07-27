@@ -290,3 +290,29 @@ export class ReportCollector {
     };
   }
 }
+
+/**
+ * Recompute the summary counts from per-element records (DH-P0-003).
+ *
+ * The summary is always derivable from `slides[].elements[].mapping_mode` plus
+ * the ignored count, so callers can verify the report was not tampered with
+ * and strict-mode gates can re-check after any post-processing.
+ */
+export function recomputeSummary(
+  report: DeckHtmlConversionReport,
+  ignoredCount = 0,
+): ConversionReportSummary {
+  const summary: ConversionReportSummary = {
+    native: 0,
+    vector: 0,
+    raster: 0,
+    ignored: ignoredCount,
+    unsupported: 0,
+  };
+  for (const slide of report.slides) {
+    for (const rec of slide.elements) {
+      summary[rec.mapping_mode]++;
+    }
+  }
+  return summary;
+}
