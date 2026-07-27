@@ -198,3 +198,95 @@ export const EMPTY_CONVERSION_STATS: ConversionStats = {
   fonts: { families: [], variants: [] },
   simplified: { total: 0, byMethod: {}, byReason: {}, slides: [], items: [] },
 };
+
+// ── DH-P0-002 per-element conversion report ───────────────────────────────
+
+export type MappingMode = 'native' | 'vector' | 'raster' | 'ignored' | 'unsupported';
+
+export interface ElementGeometry {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  unit: 'inch' | 'px';
+}
+
+export interface ElementReportRecord {
+  element_id: string | null;
+  kind: string;
+  mapping_mode: MappingMode;
+  object_ref: string | null;
+  geometry: ElementGeometry;
+  warnings: import('./utils/diagnostics').Diagnostic[];
+}
+
+export interface SlideReport {
+  slide_id: string;
+  index: number;
+  elements: ElementReportRecord[];
+}
+
+export interface ConversionReportSummary {
+  native: number;
+  vector: number;
+  raster: number;
+  ignored: number;
+  unsupported: number;
+}
+
+export interface DeckHtmlConversionReport {
+  schema_version: 1;
+  engine: { name: string; version: string };
+  status: 'succeeded' | 'failed';
+  slides: SlideReport[];
+  summary: ConversionReportSummary;
+  diagnostics: import('./utils/diagnostics').Diagnostic[];
+}
+
+/**
+ * Mutable collector used by the generator to build the per-element report.
+ */
+export class ReportCollector {
+  readonly slides: SlideReport[] = [];
+  readonly diagnostics: import('./utils/diagnostics').Diagnostic[] = [];
+  /** Number of elements excluded before reaching the generator (ignored). */
+  ignoredCount = 0;
+
+  startSlide(slideId: string, index: number): void {
+    this.slides.push({ slide_id: slideId, index, elements: [] });
+  }
+
+  addElement(record: ElementReportRecord): void {
+    const slide = this.slides[this.slides.length - 1];
+    if (slide) slide.elements.push(record);
+  }
+
+  build(
+    engineName: string,
+    engineVersion: string,
+    status: 'succeeded' | 'failed',
+  ): DeckHtmlConversionReport {
+    const summary: ConversionReportSummary = {
+      native: 0,
+      vector: 0,
+      raster: 0,
+      ignored: this.ignoredCount,
+      unsupported: 0,
+    };
+    for (const slide of this.slides) {
+      for (const rec of slide.elements) {
+        summary[rec.mapping_mode]++;
+      }
+    }
+    // Stable sort: slides by index, elements kept in insertion (DOM) order.
+    this.slides.sort((a, b) => a.index - b.index);
+    return {
+      schema_version: 1,
+      engine: { name: engineName, version: engineVersion },
+      status,
+      slides: this.slides,
+      summary,
+      diagnostics: this.diagnostics,
+    };
+  }
+}

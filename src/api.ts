@@ -4,6 +4,7 @@
  */
 
 import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   ConversionOptions,
   ConversionResult,
@@ -32,6 +33,17 @@ import { buildPlatformFontContext, PlatformFontContext } from './utils/platformF
 import { runQuietly } from './utils/quiet';
 import { embedFontAwesomeFonts } from './utils/fa-font-embedder';
 import { buildElementStats, buildFontStats, buildSimplifiedStats } from './conversion-report';
+
+const ENGINE_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+    ) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 /**
  * Read SVG viewBox / width+height for viewport auto-sizing.
@@ -169,6 +181,7 @@ function collectFontsFromElements(
 interface ProcessSingleInputResult {
   slidesMap: Map<number, ElementInfo[]>;
   slideCoordsNormalized: boolean;
+  excludedCount: number;
 }
 
 interface ProcessSingleInputRuntime {
@@ -234,6 +247,7 @@ async function processSingleInput(
 
     let slidesMap: Map<number, ElementInfo[]>;
     let slideCoordsNormalized = false;
+    const excludedCounter = { value: 0 };
 
     if (discovered.count >= 2) {
       if (options.splitByHeight) {
@@ -255,6 +269,7 @@ async function processSingleInput(
         slideIdAttribute: options.slideIdAttribute,
         identityAttribute: options.identityAttribute,
         identityDiagnostics,
+        excludedCount: excludedCounter,
       };
       const slideConcurrency =
         runtime?.slideInspectConcurrency ?? resolveSlideInspectConcurrency();
@@ -289,6 +304,7 @@ async function processSingleInput(
         slideIdAttribute: options.slideIdAttribute,
         identityAttribute: options.identityAttribute,
         identityDiagnostics,
+        excludedCount: excludedCounter,
       });
 
       if (elements.length === 0) {
@@ -313,7 +329,7 @@ async function processSingleInput(
       );
     }
 
-    return { slidesMap, slideCoordsNormalized };
+    return { slidesMap, slideCoordsNormalized, excludedCount: excludedCounter.value };
   } finally {
     await loader.close().catch(() => {});
   }
@@ -465,8 +481,8 @@ export async function convertHtmlToPptx(
     );
 
     const inspectConcurrency = resolveSlideInspectConcurrency();
+    let totalExcludedCount = 0;
   const parallelInputs = inputPaths.length > 1 && inspectConcurrency > 1;
-
   if (parallelInputs) {
     const fileConcurrency = Math.min(inspectConcurrency, inputPaths.length);
     console.log(
@@ -514,6 +530,7 @@ export async function convertHtmlToPptx(
     let slideOffset = 0;
     for (const { result } of completed) {
       slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
+      totalExcludedCount += result.excludedCount;
       slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
     }
   } else {
@@ -535,6 +552,7 @@ export async function convertHtmlToPptx(
         identityDiagnostics
       );
       slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
+      totalExcludedCount += result.excludedCount;
       slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
     }
   }
@@ -548,8 +566,19 @@ export async function convertHtmlToPptx(
     slideSelector: options.slideSelector,
     slideCoordsNormalized,
   });
+  generator.report.ignoredCount = totalExcludedCount;
+  for (const d of identityDiagnostics) generator.report.diagnostics.push(d);
+  for (const d of resourceDiagnostics) {
+    generator.report.diagnostics.push({
+      rule_id: d.rule_id,
+      severity: d.severity,
+      message: d.message,
+      recovery: d.recovery,
+    });
+  }
   const data = await generator.generate(mergedSlidesMap);
   const slideCount = generator.getSlideCount();
+  const conversionReport = generator.report.build('@deckflow/deckhtml', ENGINE_VERSION, 'succeeded');
 
   // Font Awesome is the only font family embedded locally — its icon glyphs must
   // travel with the PPTX or icons render as empty boxes on machines without FA.
@@ -569,6 +598,7 @@ export async function convertHtmlToPptx(
     },
     resourceDiagnostics,
     identityDiagnostics,
+    report: conversionReport,
   };
   });
 }

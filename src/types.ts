@@ -362,6 +362,8 @@ export interface ConversionResult {
   resourceDiagnostics?: import('./utils/resource-policy').ResourceDiagnostic[];
   /** Identity diagnostics (duplicates, missing) collected during inspection (DH-P0-001). */
   identityDiagnostics?: import('./utils/diagnostics').Diagnostic[];
+  /** Per-element conversion report (DH-P0-002). */
+  report?: import('./conversion-report').DeckHtmlConversionReport;
 }
 
 // Style enhancement types

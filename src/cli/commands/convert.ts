@@ -188,6 +188,7 @@ async function runLocalConvert(
     mode: 'local',
     slideCount: result.slideCount,
     stats: result.stats,
+    conversionReport: result.report,
   };
 }
 
@@ -397,21 +398,25 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
 
           if (options.report) {
             const reportPath = `${outputPath}.report.json`;
-            const report = buildConversionReport({
-              input: paths,
-              output: outputPath,
-              format,
-              mode: envelope.mode,
-              slideCount: envelope.slideCount ?? 0,
-              stats: envelope.stats ?? EMPTY_CONVERSION_STATS,
-              platform,
-              ...(mode === 'local'
-                ? { viewport: localViewport }
-                : cloudViewport
-                  ? { viewport: cloudViewport }
-                  : {}),
-              durationMs: Date.now() - startedAt,
-            });
+            // Prefer the new structured per-element report (DH-P0-002) when available
+            // (local mode); fall back to the aggregate stats report for cloud mode.
+            const report =
+              envelope.conversionReport ??
+              buildConversionReport({
+                input: paths,
+                output: outputPath,
+                format,
+                mode: envelope.mode,
+                slideCount: envelope.slideCount ?? 0,
+                stats: envelope.stats ?? EMPTY_CONVERSION_STATS,
+                platform,
+                ...(mode === 'local'
+                  ? { viewport: localViewport }
+                  : cloudViewport
+                    ? { viewport: cloudViewport }
+                    : {}),
+                durationMs: Date.now() - startedAt,
+              });
             await atomicWriteFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
               overwrite: options.force,
             });

@@ -51,6 +51,8 @@ export interface InspectElementsOptions {
   identityAttribute?: string;
   /** Collector for identity diagnostics (duplicates) (DH-P0-001). */
   identityDiagnostics?: import('./utils/diagnostics').Diagnostic[];
+  /** Mutable accumulator for excluded element count (DH-P0-002). */
+  excludedCount?: { value: number };
 }
 
 const SLIDE_INDEX_ATTR = 'data-deckhtml-slide-index';
@@ -5690,6 +5692,7 @@ export class ElementInspector {
         `🚫 Excluded ${excludedCount} runtime/navigation element(s) via excludeSelector or data-pptx-kind=ignore: ` +
           excludedSamples.join(', '),
       );
+      if (options?.excludedCount) options.excludedCount.value += excludedCount;
     }
     for (const msg of identityWarnings) {
       console.warn(`⚠️  ${msg}`);

@@ -15,6 +15,8 @@ import { fixPresentationXmlOrderInPptx } from './utils/pptx-presentation-xml-fix
 import { resolveImageSourceForPptx, validateDataImageUrl } from './utils/resource-policy';
 import { getPlaceholderForMediaType } from './utils/placeholder-assets';
 import { ensurePptxgenAllowsHttp } from './utils/pptxgen-http-patch';
+import { ReportCollector, type ElementReportRecord, type MappingMode } from './conversion-report';
+import { pxToInchX, pxToInchY } from './utils/coordinate';
 
 // pptxgenjs must accept plain http:// for all remote media types.
 ensurePptxgenAllowsHttp();
@@ -37,6 +39,8 @@ export class PPTXGenerator {
   private slideSelector?: string;
   private slideCoordsNormalized: boolean;
   private registry: StyleEnhancementRegistry;
+  /** Per-element report collector (DH-P0-002). */
+  readonly report = new ReportCollector();
 
   constructor(options: PPTXGeneratorOptions = {}) {
     this.pptx = new PptxGenJS();
@@ -146,6 +150,10 @@ export class PPTXGenerator {
     slideIndex: number
   ): Promise<void> {
     const slide = this.pptx.addSlide();
+
+    // DH-P0-002: start a per-element report section for this slide.
+    const slideId = this.resolveSlideId(elements, slideIndex);
+    this.report.startSlide(slideId, slideIndex + 1);
 
     // Origin Y for this slide's elements. For a single long HTML split by height or
     // slide selector, use the topmost element; for merged multi-file inputs each file
@@ -417,15 +425,81 @@ export class PPTXGenerator {
           }
 
           await this.addElementToSlide(slide, converted, currentShapeIndex);
+
+          // DH-P0-002: record this element in the per-element report.
+          this.recordElement(element, converted, slideIndex);
+
           elementIndex++;
           if (isShapeElement) shapeIndex++;
           if (isImageElement) picIndex++;
         }
       } catch (error) {
         console.warn(`Failed to convert element:`, error);
+        // DH-P0-002: record the failed element as unsupported.
+        this.recordElement(element, null, slideIndex, error);
       }
     }
     console.log(`Slide ${slideIndex + 1}: Added ${elementCount} source elements (${elementIndex} total elements)`);
+  }
+
+  /**
+   * Push a per-element record into the report collector (DH-P0-002).
+   */
+  private recordElement(
+    element: ElementInfo,
+    converted: any,
+    slideIndex: number,
+    error?: unknown,
+  ): void {
+    const mappingMode = this.resolveMappingMode(element, converted, Boolean(error));
+    const objectRef = element.elementId
+      ? `ppt/slides/slide${slideIndex + 1}.xml#name:${element.elementId}`
+      : null;
+    const record: ElementReportRecord = {
+      element_id: element.elementId ?? null,
+      kind: element.type,
+      mapping_mode: mappingMode,
+      object_ref: objectRef,
+      geometry: {
+        x: pxToInchX(element.x),
+        y: pxToInchY(element.y),
+        w: pxToInchX(element.width),
+        h: pxToInchY(element.height),
+        unit: 'inch',
+      },
+      warnings: error
+        ? [
+            {
+              rule_id: 'DECKHTML_MAPPING_CLOSURE_FAILURE',
+              severity: 'warning',
+              element_id: element.elementId ?? null,
+              message: error instanceof Error ? error.message : String(error),
+            },
+          ]
+        : [],
+    };
+    this.report.addElement(record);
+  }
+
+  private resolveMappingMode(
+    element: ElementInfo,
+    converted: any,
+    failed: boolean,
+  ): MappingMode {
+    if (failed) return 'unsupported';
+    if (element.rasterMethod) return 'raster';
+    // SVG exported as a native SVG image counts as vector.
+    if (element.type === 'svg' && !element.rasterMethod) return 'vector';
+    // SVG hybrid raster (foreignObject) is raster, already covered above.
+    if (element.type === 'text' || element.type === 'image' || element.type === 'shape' || element.type === 'table') {
+      return 'native';
+    }
+    // video/audio/canvas without rasterization are unsupported natively.
+    if (element.type === 'video' || element.type === 'audio' || element.type === 'canvas') {
+      return 'unsupported';
+    }
+    if (converted && converted.type) return 'native';
+    return 'unsupported';
   }
 
   /**
@@ -534,6 +608,17 @@ export class PPTXGenerator {
       default:
         console.warn(`Unknown element type: ${converted.type}`);
     }
+  }
+
+  /**
+   * Stable slide id for the report (DH-P0-002). Falls back to slide-NN.
+   */
+  private resolveSlideId(elements: ElementInfo[], slideIndex: number): string {
+    for (const el of elements) {
+      const sid = (el as ElementInfo & { slideId?: string }).slideId;
+      if (sid) return sid;
+    }
+    return `slide-${String(slideIndex + 1).padStart(2, '0')}`;
   }
 
   /**

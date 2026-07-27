@@ -171,7 +171,10 @@ export interface ConversionResultEnvelope {
   slideCount?: number;
   stats?: ConversionStats;
   simplified?: ConversionSimplifiedStats;
+  /** Path to the written report file (when --report is set). */
   report?: string;
+  /** Structured per-element conversion report (DH-P0-002). */
+  conversionReport?: import('../../conversion-report').DeckHtmlConversionReport;
 }
 
 const SIMPLIFIED_REASON_LABELS: Record<string, string> = {
