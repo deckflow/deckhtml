@@ -54,13 +54,15 @@ deckhtml https://example.com/deck.html -o deck.pptx
 
 ## Output Formats
 
+Output format is inferred from the `-o` extension:
+
 | Format | Description |
 | --- | --- |
 | `pptx` | PowerPoint deck output (default) |
 | `png` | PNG frame output |
 
 ```bash
-deckhtml index.html --format png -o frames
+deckhtml index.html -o frames.png
 ```
 
 ## Execution Modes
@@ -82,19 +84,13 @@ These flags require cloud mode:
 
 | Flag | Description |
 | --- | --- |
-| `--rebuild-svg` | Rebuild SVG objects |
-| `--rebuild-chart` | Rebuild chart objects |
 | `--embed-fonts` | Embed fonts into the output |
-| `--map-motion` | Map animations into the output |
 
 ```bash
 deckhtml index.html \
   -o deck.pptx \
   --mode cloud \
-  --rebuild-svg \
-  --rebuild-chart \
-  --embed-fonts \
-  --map-motion
+  --embed-fonts
 ```
 
 ## Authentication & Config
@@ -138,12 +134,11 @@ Credentials are stored locally at `~/.deckflow/credentials`.
 | `--json` | Machine-readable JSON on stdout | `false` |
 | `--report` | Generate a conversion report | Off |
 | `--mode <mode>` | `auto`, `local`, or `cloud` | `auto` |
-| `--render-wait <seconds>` | Wait before capturing each page | `3` |
-| `--format <format>` | `pptx` or `png` | `pptx` |
-| `--webhook <url>` | Cloud callback URL | Config |
-| `--retention-hours <n>` | Cloud file retention (hours) | Config |
+| `--width <pixels>` | Playwright viewport width (height scales at 16:9) | `1920` |
+| `--platform <platform>` | `win`, `mac`, `ios`, `android`, or `linux` | Detected |
+| `--embed-fonts` | Embed fonts (cloud only) | `false` |
 
-`--quiet` and `--verbose` cannot be used together.
+`--quiet` and `--verbose` cannot be used together. Output format is inferred from the `-o` extension (`pptx` or `png`).
 
 ### JSON Output
 
@@ -163,15 +158,20 @@ deckhtml index.html -o deck.pptx --json
 
 ## Programmatic API
 
-Use the package as a library in Node.js:
+Use the package as a library in Node.js. The library returns a `Buffer` (or PNG image buffers) — it never writes to disk on its own. Write the output yourself, or use the CLI for file output.
 
 ```javascript
 import { convertHtmlToPptx } from '@deckflow/deckhtml';
 
 const result = await convertHtmlToPptx({
   input: 'index.html',
-  output: 'deck.pptx',
 });
+// result.data: Buffer containing the PPTX file
+// result.slideCount: number of slides
+// result.usedFonts: resolved font names
+// result.stats: element/font/simplified statistics
+import { writeFileSync } from 'node:fs';
+writeFileSync('deck.pptx', result.data);
 ```
 
 ## Documentation

@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/deckflow/deckhtml/schemas/conversion-result.schema.json",
+  "title": "DeckHTML Conversion Result Envelope",
+  "description": "Machine-readable result envelope emitted by the deckhtml CLI with --json (DH-P0-008).",
+  "type": "object",
+  "required": ["ok", "input", "output", "format", "mode"],
+  "additionalProperties": false,
+  "properties": {
+    "ok": { "type": "boolean" },
+    "input": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "output": { "type": "string" },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "format": { "type": "string", "enum": ["pptx", "png", "pdf"] },
+    "mode": { "type": "string", "enum": ["local", "cloud"] },
+    "slideCount": { "type": "integer", "minimum": 0 },
+    "report": { "type": ["string", "null"] },
+    "stats": { "type": "object" },
+    "simplified": { "type": ["object", "null"] }
+  }
+}

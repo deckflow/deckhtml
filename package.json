@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "assets"
+    "assets",
+    "schemas"
   ],
   "bin": {
     "deckhtml": "./dist/cli.js"
