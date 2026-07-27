@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>P0-005 page selection & runtime exclusion</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  .slide-container { width: 1280px; height: 720px; position: relative; }
+  .player-nav { display: flex; gap: 8px; }
+  .toolbar { display: block; }
+</style>
+</head>
+<body>
+  <section class="slide-container" data-slide-id="cover">
+    <h1 data-element-id="cover-title">Slide One</h1>
+    <p data-element-id="cover-body">Body text for slide one.</p>
+    <div class="toolbar" data-pptx-kind="ignore">
+      <span>Host toolbar — should NOT be exported</span>
+    </div>
+    <div class="player-nav">
+      <button>←</button>
+      <button>→</button>
+      <span>← / → to navigate</span>
+    </div>
+  </section>
+  <section class="slide-container" data-slide-id="agenda">
+    <h2 data-element-id="agenda-title">Slide Two</h2>
+  </section>
+</body>
+</html>

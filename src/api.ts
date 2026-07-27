@@ -248,7 +248,11 @@ async function processSingleInput(
         );
       }
 
-      const inspectOptions = { inputIsSvg };
+      const inspectOptions = {
+        inputIsSvg,
+        excludeSelector: options.excludeSelector,
+        slideIdAttribute: options.slideIdAttribute,
+      };
       const slideConcurrency =
         runtime?.slideInspectConcurrency ?? resolveSlideInspectConcurrency();
       if (slideConcurrency > 1 && discovered.count > 1) {
@@ -278,6 +282,8 @@ async function processSingleInput(
     } else {
       const elements = await inspector.inspectElements(options.slideSelector, {
         inputIsSvg,
+        excludeSelector: options.excludeSelector,
+        slideIdAttribute: options.slideIdAttribute,
       });
 
       if (elements.length === 0) {

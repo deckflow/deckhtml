@@ -11,6 +11,10 @@ export interface ConversionOptions {
   /** Multiple HTML/SVG input files — processed in order, merged into one PPTX */
   inputs?: string[];
   slideSelector?: string;
+  /** CSS selector matching runtime/navigation elements to exclude from conversion (DH-P0-005). */
+  excludeSelector?: string;
+  /** Attribute name carrying a stable per-slide id (default: data-slide-id) (DH-P0-005). */
+  slideIdAttribute?: string;
   splitByHeight?: boolean;
   /** Auto-detect multi-slide containers in one HTML file (default true). */
   autoDetectSlides?: boolean;

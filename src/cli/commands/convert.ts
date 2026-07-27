@@ -46,6 +46,7 @@ export interface ConvertOptions {
   embedFonts?: boolean;
   report?: boolean;
   executablePath?: string;
+  exclude?: string;
   force?: boolean;
 }
 
@@ -91,7 +92,8 @@ async function runLocalConvert(
   format: string,
   platform: PlatformTarget,
   executablePath?: string,
-  force?: boolean
+  force?: boolean,
+  excludeSelector?: string
 ): Promise<ConversionResultEnvelope> {
   if (format === 'png') {
     logVerbose(
@@ -111,6 +113,7 @@ async function runLocalConvert(
       viewportHeight: viewport.height,
       allowLocalResources: true,
       quiet: ctx.quiet,
+      excludeSelector,
       browser: executablePath ? { executablePath } : undefined,
     });
 
@@ -166,6 +169,7 @@ async function runLocalConvert(
     allowLocalResources: true,
     quiet: ctx.quiet,
     platform,
+    excludeSelector,
     browser: executablePath ? { executablePath } : undefined,
   });
 
@@ -307,6 +311,10 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       'Chromium executable to use for local conversion (overrides DECKHTML_CHROMIUM_EXECUTABLE_PATH)'
     )
     .option(
+      '--exclude <selector>',
+      'CSS selector matching runtime/navigation elements to exclude from conversion'
+    )
+    .option(
       '--force',
       'Overwrite an existing output file instead of refusing (default: refuse)',
       false
@@ -373,7 +381,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               format,
               platform,
               options.executablePath,
-              options.force
+              options.force,
+              options.exclude
             );
           }
 

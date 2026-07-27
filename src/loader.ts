@@ -255,15 +255,16 @@ export class HTMLLoader {
   }
 
   /**
-   * Close this loader's page. Does not close a caller-injected browser.
+   * Close this loader's page. Does not close a caller-injected browser or the
+   * process-owned shared context (other loaders / parallel inspect may still
+   * need it). The owned context is closed on process exit or via closeOwnedBrowser().
    */
   async close(): Promise<void> {
     if (this.page) {
       await this.page.close();
       this.page = null;
     }
-    // Borrowed contexts (caller-owned browser) are left open for the caller.
-    // The owned context is shared across loaders and closed on process exit.
-    this.browser = null;
+    // Keep this.browser reference so parallel-inspect can open new pages from
+    // the shared owned context after the loader's primary page is closed.
   }
 }

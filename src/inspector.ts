@@ -43,6 +43,10 @@ export interface SlideContainerDiscovery {
 
 export interface InspectElementsOptions {
   inputIsSvg?: boolean;
+  /** CSS selector matching runtime/navigation elements to exclude (DH-P0-005). */
+  excludeSelector?: string;
+  /** Attribute name carrying a stable per-slide id (DH-P0-005). */
+  slideIdAttribute?: string;
 }
 
 const SLIDE_INDEX_ATTR = 'data-deckhtml-slide-index';
@@ -1186,9 +1190,11 @@ export class ElementInspector {
   ): Promise<ElementInfo[]> {
     const inputIsSvg = options?.inputIsSvg ?? false;
     const elements = await this.page.evaluate(
-      async ({ slideSelector, slideHeight, inputIsSvg }) => {
+      async ({ slideSelector, slideHeight, inputIsSvg, excludeSelector, slideIdAttribute }) => {
         const result: any[] = [];
         const _debugInfo: string[] = [];
+        const _excludedCount = { value: 0 };
+        const _excludedSamples: string[] = [];
         /**
          * Check if element is a Font Awesome icon (helper for visibility check)
          */
@@ -4616,6 +4622,28 @@ export class ElementInspector {
           if (!element || !element.tagName) return;
           if (isSvgNonRenderElement(element)) return;
 
+          // DH-P0-005: runtime / navigation exclusion.
+          // Skip the element and its entire subtree when it matches excludeSelector
+          // or carries data-pptx-kind="ignore". Record a sample for diagnostics.
+          if (element instanceof Element) {
+            const explicitIgnore =
+              element.getAttribute('data-pptx-kind') === 'ignore';
+            const selectorMatched = excludeSelector
+              ? element.closest(excludeSelector) !== null
+              : false;
+            if (explicitIgnore || selectorMatched) {
+              if (_excludedCount.value < 5) {
+                _excludedSamples.push(
+                  (explicitIgnore ? '[data-pptx-kind=ignore]' : '[excludeSelector]') +
+                    ' ' +
+                    (element.id ? '#' + element.id : '<' + element.tagName.toLowerCase() + '>'),
+                );
+              }
+              _excludedCount.value++;
+              return;
+            }
+          }
+
           // const elementSelector = getElementSelector(element);
           // if (elementSelector === 'BODY > DIV.slide-container > HEADER > DIV.tag') {
           //   _debugInfo.push(`[DEBUG] Processing target element: ${elementSelector}`);
@@ -5582,22 +5610,38 @@ export class ElementInspector {
 
         // Keep raw viewport coordinates. Do not normalize by inner slide/container size.
 
-        result.push({ _debugInfo });
+        result.push({ _debugInfo, _excludedCount: _excludedCount.value, _excludedSamples });
         return result;
       },
-      { slideSelector, slideHeight: getSlideHeightPx(), inputIsSvg }
+      {
+        slideSelector,
+        slideHeight: getSlideHeightPx(),
+        inputIsSvg,
+        excludeSelector: options?.excludeSelector,
+        slideIdAttribute: options?.slideIdAttribute,
+      }
     );
 
     // Check if the last element is our debug info
     const lastElement = elements[elements.length - 1];
     let _debugInfo: string[] = [];
-    if (lastElement && lastElement._debugInfo) {
-      _debugInfo = lastElement._debugInfo;
+    let excludedCount = 0;
+    let excludedSamples: string[] = [];
+    if (lastElement && (lastElement as any)._debugInfo) {
+      _debugInfo = (lastElement as any)._debugInfo;
+      excludedCount = (lastElement as any)._excludedCount ?? 0;
+      excludedSamples = (lastElement as any)._excludedSamples ?? [];
       elements.pop(); // Remove the debug info object from the elements array
     }
 
     for (const msg of _debugInfo) {
       console.log(msg);
+    }
+    if (excludedCount > 0) {
+      console.warn(
+        `🚫 Excluded ${excludedCount} runtime/navigation element(s) via excludeSelector or data-pptx-kind=ignore: ` +
+          excludedSamples.join(', '),
+      );
     }
 
     for (const el of elements as ElementInfo[]) {
