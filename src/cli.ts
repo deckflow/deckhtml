@@ -12,15 +12,20 @@ import { registerAuthCommands } from './cli/commands/auth';
 import { registerConfigCommands } from './cli/commands/config';
 import { registerConvertCommand } from './cli/commands/convert';
 import { ExitCode, outputError } from './cli/utils/errors';
+import { notifyUpdate } from './utils/update-notifier';
 
 const packageJson = JSON.parse(
   readFileSync(join(__dirname, '../package.json'), 'utf-8')
-) as { version?: string };
+) as { name?: string; version?: string };
+const CLI_NAME = packageJson.name ?? '@deckflow/deckhtml';
 const CLI_VERSION = packageJson.version ?? '0.0.0';
 
 async function main(): Promise<void> {
   const ctx = new Context();
   await ctx.init();
+
+  // 静默检查并提示升级到最新版（失败不影响主流程）
+  await notifyUpdate({ name: CLI_NAME, version: CLI_VERSION });
 
   const program = new Command();
 
