@@ -44,10 +44,7 @@ export class Context {
   async getDeck(): Promise<DeckClient> {
     const apiKey = this.resolveApiKey();
     const token = this.config.get('token');
-
-    if (!apiKey && !token) {
-      await this.ensureLoggedIn(DEFAULT_PORT, 'explicit');
-    }
+    const hadCredentials = Boolean(apiKey || token);
 
     if (!this.deck) {
       await installApiErrorCapture({
@@ -60,7 +57,13 @@ export class Context {
         token,
         spaceId: this.config.get('spaceId'),
         onUnauthorized: async () => {
-          const nextToken = await this.ensureLoggedIn();
+          // Guests (UUID-only) reach here when the server rejects them with
+          // 401 (rate limit or guest access disabled); authenticated users
+          // reach here when their token expired.
+          const nextToken = await this.ensureLoggedIn(
+            DEFAULT_PORT,
+            hadCredentials ? 'unauthorized' : 'guest-limit'
+          );
           return { token: nextToken, spaceId: this.config.get('spaceId') };
         },
         onPaymentRequired: async () => {
@@ -78,7 +81,7 @@ export class Context {
 
   async ensureLoggedIn(
     port: number = DEFAULT_PORT,
-    reason: 'explicit' | 'unauthorized' = 'unauthorized'
+    reason: 'explicit' | 'unauthorized' | 'guest-limit' = 'unauthorized'
   ): Promise<string> {
     if (this.loginPromise) {
       return this.loginPromise;

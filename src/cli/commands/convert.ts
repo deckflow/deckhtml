@@ -216,6 +216,12 @@ async function runCloudConvert(
   const taskName = path.basename(inputPaths[0]!, path.extname(inputPaths[0]!));
 
   logVerbose(ctx.verbose, ctx.quiet, `API base: ${ctx.config.apiBase}`);
+  if (!ctx.hasCredentials()) {
+    logProgress(
+      ctx.quiet,
+      'Guest mode (X-Auth-UUID only): cloud usage is rate-limited. Run `deckhtml auth login` or `deckhtml config set api-key <key>` for full access.'
+    );
+  }
   logVerbose(
     ctx.verbose,
     ctx.quiet,

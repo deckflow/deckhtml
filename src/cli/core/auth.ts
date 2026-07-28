@@ -183,14 +183,25 @@ export async function runLoginFlow(options: {
   apiBase: string;
   port: number;
   jsonOutput: boolean;
-  reason?: 'explicit' | 'unauthorized';
+  reason?: 'explicit' | 'unauthorized' | 'guest-limit';
 }): Promise<{ token: string; spaceId?: string }> {
   const isZh = isChineseCliLocale();
   const callbackUrl = `http://localhost:${options.port}`;
   const loginUrl = buildLoginUrl(options.apiBase, callbackUrl);
 
   if (!options.jsonOutput) {
-    if (options.reason === 'unauthorized') {
+    if (options.reason === 'guest-limit') {
+      console.error(
+        isZh
+          ? '\n游客模式的云端使用次数已达上限（或云端已要求登录）。登录或配置 API Key 后即可继续。\n'
+          : '\nGuest cloud usage limit reached (or sign-in is now required). Log in or set an API key to continue.\n'
+      );
+      console.error(
+        isZh
+          ? '提示：也可以直接运行 `deckhtml config set api-key <key>` 配置 API Key，无需浏览器登录。\n'
+          : 'Tip: you can also run `deckhtml config set api-key <key>` to set an API key without browser login.\n'
+      );
+    } else if (options.reason === 'unauthorized') {
       console.error(
         isZh
           ? '\n认证已失效，需要重新登录。\n'

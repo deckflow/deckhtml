@@ -198,7 +198,7 @@ Common error categories:
 | Code | Meaning |
 | --- | --- |
 | `usage_error` | Invalid flags, missing input, bad mode, or conflicting flags. |
-| `auth_error` | Cloud mode requires an API key but none is configured, or the key is invalid. |
+| `auth_error` | Cloud rejected the request with 401 (guest rate limit reached, guest access disabled, or an invalid/expired credential). Run `deckhtml auth login` or `deckhtml config set api-key <key>`. |
 | `render_error` | The page could not be loaded or rendered. |
 | `conversion_error` | Conversion failed after rendering. |
 
