@@ -318,6 +318,12 @@ export function buildElementAnimations(input: BuildAnimationsInput): BuiltAnimat
   const animations: ElementAnimation[] = [];
   const unmapped: BuiltAnimations['unmapped'] = [];
 
+  // Effects derived from a single source animation (a CSS @keyframes rule or
+  // one anime.js call) that combine fade with a single-axis motion must play in
+  // parallel. The first mapped effect honors the source trigger; every
+  // subsequent mapped effect rides on it as withPrevious so timing-xml emits
+  // them inside the same parallel first-par instead of chaining them as
+  // afterPrevious siblings (which would serialize fade→fly→…).
   const push = (
     source: ElementAnimation['source'],
     effects: NormalizedAnimationEffect[],
@@ -325,12 +331,15 @@ export function buildElementAnimations(input: BuildAnimationsInput): BuiltAnimat
     delayMs: number,
     trigger: AnimationTrigger
   ): void => {
+    let firstMapped = true;
     for (const effect of effects) {
       if (effect.kind === 'unmapped') {
         unmapped.push({ source, raw: effect.raw, reason: effect.reason });
-      } else {
-        animations.push({ source, effect, trigger, durationMs, delayMs });
+        continue;
       }
+      const effTrigger = firstMapped ? trigger : 'withPrevious';
+      animations.push({ source, effect, trigger: effTrigger, durationMs, delayMs });
+      firstMapped = false;
     }
   };
 

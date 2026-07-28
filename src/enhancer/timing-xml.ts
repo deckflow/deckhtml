@@ -25,8 +25,12 @@ interface EffectItem {
 interface EffectGroup {
   /** true = plays automatically when the slide shows (no click wait). */
   auto: boolean;
-  first: EffectItem[];
-  after: EffectItem[];
+  /**
+   * Ordered parallel bundles. Each bundle is a list of effects that play
+   * simultaneously; bundles chain sequentially (afterPrevious). The first
+   * bundle's first item determines whether the group is click-triggered.
+   */
+  slots: EffectItem[][];
 }
 
 const FLY_SUBTYPE: Record<string, number> = { bottom: 4, left: 8, top: 1, right: 2 };
@@ -201,24 +205,23 @@ function genGroupXml(group: EffectGroup, ids: IdAllocator): string {
   xml += '</p:stCondLst>';
   xml += '<p:childTnLst>';
 
-  xml += '<p:par>';
-  xml += `<p:cTn id="${ids.next()}" fill="hold">`;
-  xml += '<p:stCondLst><p:cond delay="0"/></p:stCondLst>';
-  xml += '<p:childTnLst>';
-  for (const item of group.first) {
-    xml += genEffectParXml(item, nodeTypeFor(item.animation.trigger), ids);
-  }
-  xml += '</p:childTnLst></p:cTn></p:par>';
-
-  let cumulative = group.first.reduce((max, it) => Math.max(max, itemSpanMs(it)), 0);
-  for (const item of group.after) {
+  // Each slot is one parallel bundle; slots chain sequentially via cumulative
+  // delay on the wrapping par. Within a slot, every effect is a sibling par
+  // sharing the same start delay, so they play in parallel.
+  let cumulative = 0;
+  for (let s = 0; s < group.slots.length; s++) {
+    const slot = group.slots[s];
+    if (slot.length === 0) continue;
     xml += '<p:par>';
     xml += `<p:cTn id="${ids.next()}" fill="hold">`;
     xml += `<p:stCondLst><p:cond delay="${cumulative}"/></p:stCondLst>`;
     xml += '<p:childTnLst>';
-    xml += genEffectParXml(item, 'afterEffect', ids);
+    for (const item of slot) {
+      xml += genEffectParXml(item, nodeTypeFor(item.animation.trigger), ids);
+    }
     xml += '</p:childTnLst></p:cTn></p:par>';
-    cumulative += itemSpanMs(item);
+    // The next slot starts after the slowest effect in this slot finishes.
+    cumulative += slot.reduce((max, it) => Math.max(max, itemSpanMs(it)), 0);
   }
 
   xml += '</p:childTnLst></p:cTn></p:par>';
@@ -229,32 +232,47 @@ function genGroupXml(group: EffectGroup, ids: IdAllocator): string {
  * Expand entries into per-effect items (an element with fade+fly becomes two
  * sibling effect pars played in parallel), then group by trigger in document
  * order:
- * - onClick starts a new click group;
- * - afterPrevious with no open group starts an auto-play group, otherwise
- *   joins the open group's after-chain;
- * - withPrevious joins the open group's first par (or starts an auto group).
+ * - onClick starts a new click group (and the first slot);
+ * - afterPrevious starts a new sequential slot in the open group, or opens
+ *   an auto-play group if none is open;
+ * - withPrevious joins the most recent slot of the open group (parallel with
+ *   the effect that precedes it), so effects derived from one source
+ *   animation (e.g. CSS fade+fly, or one anime.js call) play together.
  */
 function groupEffects(items: EffectItem[]): EffectGroup[] {
   const groups: EffectGroup[] = [];
   let current: EffectGroup | null = null;
+  const openSlot = (): EffectItem[] | null => {
+    if (!current || current.slots.length === 0) return null;
+    return current.slots[current.slots.length - 1];
+  };
+  const newSlot = (group: EffectGroup): EffectItem[] => {
+    const slot: EffectItem[] = [];
+    group.slots.push(slot);
+    return slot;
+  };
   for (const item of items) {
     const t = item.animation.trigger;
     if (t === 'onClick') {
-      current = { auto: false, first: [item], after: [] };
+      current = { auto: false, slots: [] };
       groups.push(current);
+      newSlot(current).push(item);
     } else if (t === 'withPrevious') {
       if (!current) {
-        current = { auto: true, first: [], after: [] };
+        current = { auto: true, slots: [] };
         groups.push(current);
       }
-      current.first.push(item);
+      let slot = openSlot();
+      if (!slot) slot = newSlot(current);
+      slot.push(item);
     } else {
+      // afterPrevious: a fresh sequential slot. Open an auto group if nothing
+      // is open yet.
       if (!current) {
-        current = { auto: true, first: [item], after: [] };
+        current = { auto: true, slots: [] };
         groups.push(current);
-      } else {
-        current.after.push(item);
       }
+      newSlot(current).push(item);
     }
   }
   return groups;
