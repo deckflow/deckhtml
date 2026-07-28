@@ -6,7 +6,7 @@
  *   - `executablePath` resolution order:
  *       1. explicit `executablePath` option
  *       2. `DECKHTML_CHROMIUM_EXECUTABLE_PATH` env
- *       3. Playwright's bundled Chromium (from `npx playwright-core install chromium`)
+ *       3. Playwright's bundled Chromium (from `npx playwright install chromium`)
  *       4. system Chrome / Edge discovered via `chrome-launcher`
  *   - `userDataDir` (option or DECKHTML_BROWSER_DATA_DIR env) opts into a persistent
  *     profile. By default a fresh temp directory is created per process and removed
@@ -103,7 +103,7 @@ async function resolveExecutablePath(option?: string): Promise<string | undefine
   if (option) return option;
   // 2. Environment override.
   if (ENV_EXECUTABLE_PATH) return ENV_EXECUTABLE_PATH;
-  // 3. Playwright-core's bundled Chromium (installed via `npx playwright-core install chromium`).
+  // 3. Playwright-core's bundled Chromium (installed via `npx playwright install chromium`).
   //    `chromium.executablePath()` may throw when the bundle is absent, and may return a
   //    path that doesn't exist on disk — guard both.
   try {
@@ -233,7 +233,7 @@ export class HTMLLoader {
           : [
               'No usable Chromium/Chrome was found. To fix this, choose one of:',
               '  • Install Playwright\'s bundled Chromium:',
-              '      npx playwright-core install chromium',
+              '      npx playwright install chromium',
               '  • Or install Google Chrome / Microsoft Edge on this machine and retry.',
               '  • Or point to an existing Chromium binary:',
               '      export DECKHTML_CHROMIUM_EXECUTABLE_PATH=/path/to/chrome',
