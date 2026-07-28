@@ -81,6 +81,13 @@ export class PPTXGenerator {
       await this.createSlide(elements, slideIndex);
     }
 
+    // Register one animationGroup enhancement per slide/group: wraps every
+    // member shape (sharing the group objectName) into a <p:grpSp> so the
+    // entrance animation targets the group as a whole, mirroring HTML subtree
+    // animation. Must run before the 'animation' enhancement so the group
+    // <p:grpSp> already exists when p:timing resolves spids.
+    this.registerAnimationGroupEnhancements(slidesMap);
+
     // Register one aggregated animation enhancement per animated slide
     for (const [slideIndex, spec] of this.animationSpecs) {
       this.registry.register({
@@ -432,24 +439,33 @@ export class PPTXGenerator {
 
           // DH-P0-001: propagate caller-declared identity to the PPTX object name
           // so each shape/picture/table can be looked up in the Selection Pane.
-          if (element.elementId && converted.options && typeof converted.options === 'object') {
-            (converted.options as any).objectName = element.elementId;
+          // When the element belongs to an animation group, the group name wins
+          // so the post-processor can wrap all member shapes into one <p:grpSp>.
+          const animGroupName = element.animationGroupId
+            ? `dh-grp-${element.animationGroupId}`
+            : null;
+          if (converted.options && typeof converted.options === 'object') {
+            if (animGroupName) {
+              (converted.options as any).objectName = animGroupName;
+            } else if (element.elementId) {
+              (converted.options as any).objectName = element.elementId;
+            }
           }
 
           // Animations: the object needs a name the p:timing injector can
           // resolve to a spid. Elements without a caller identity get a
           // deterministic internal name; the per-slide spec is aggregated and
-          // registered as a single enhancement in generate().
+          // registered as a single enhancement in generate(). When the element
+          // is an animation-group root, the target is the group name so the
+          // whole <p:grpSp> animates together.
           if (
             element.animations &&
             element.animations.length > 0 &&
             converted.options &&
             typeof converted.options === 'object'
           ) {
-            const objectName = element.elementId ?? `dh-anim-${slideIndex}-${elementIndex}`;
-            if (!element.elementId) {
-              (converted.options as any).objectName = objectName;
-            }
+            const objectName =
+              animGroupName ?? element.elementId ?? `dh-anim-${slideIndex}-${elementIndex}`;
             this.registerAnimationEntry(slideIndex, objectName, element.animations);
           }
 
@@ -499,6 +515,43 @@ export class PPTXGenerator {
           `${a.trigger}|${a.durationMs}|${a.delayMs}|${JSON.stringify(a.effect)}` === key
       );
       if (!dup) entry.animations.push(animation);
+    }
+  }
+
+  /**
+   * For each slide, find animation groups (sets of elements sharing the same
+   * `animationGroupId`) whose root carries mapped entrance animations, and
+   * register one `animationGroup` enhancement per group. The post-processor
+   * wraps every member shape (all stamped with the group objectName) into a
+   * single <p:grpSp> so the entrance animation targets the group as a whole.
+   *
+   * Groups with only one member (root with no converted descendants) are
+   * skipped — there is nothing to wrap, and the root shape already carries
+   * the animation target name.
+   */
+  private registerAnimationGroupEnhancements(
+    slidesMap: Map<number, ElementInfo[]>
+  ): void {
+    for (const [slideIndex, elements] of slidesMap) {
+      const byGroup = new Map<string, { count: number; hasAnimation: boolean }>();
+      for (const el of elements) {
+        const gid = el.animationGroupId;
+        if (!gid) continue;
+        const acc = byGroup.get(gid) ?? { count: 0, hasAnimation: false };
+        acc.count += 1;
+        if (el.animations && el.animations.length > 0) acc.hasAnimation = true;
+        byGroup.set(gid, acc);
+      }
+      for (const [gid, acc] of byGroup) {
+        if (!acc.hasAnimation) continue;
+        if (acc.count <= 1) continue;
+        this.registry.register({
+          slideIndex,
+          elementIndex: 0,
+          type: 'animationGroup',
+          animationGroupData: { groupName: `dh-grp-${gid}` },
+        });
+      }
     }
   }
 

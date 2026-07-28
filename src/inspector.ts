@@ -1383,6 +1383,10 @@ export class ElementInspector {
         const _kindDiagnostics: any[] = [];
         const _seenElementIds = new Map<string, number>();
         const _identityAttr = identityAttribute || 'data-element-id';
+        // Counter for synthesized animation-group root ids (when the author did
+        // not give the carrying element a data-element-id). Stamped as
+        // data-dh-anim-gid so descendants can inherit via closest().
+        let _animRootCounter = 0;
 
         /** Read a stable caller-declared identity from an element (DH-P0-001). */
         function readElementIdentity(element: Element): string | undefined {
@@ -1457,6 +1461,43 @@ export class ElementInspector {
             }
           }
           return Object.keys(raw).length > 0 ? raw : undefined;
+        }
+
+        /**
+         * Resolve the animation group id for an element: the nearest ancestor
+         * (including self) carrying a stamped data-dh-anim-gid. Group roots are
+         * stamped in processElement so descendants inherit the same id, letting
+         * the generator wrap all member shapes into one PPTX <p:grpSp> whose
+         * entrance animation targets the group (matches HTML subtree animation).
+         */
+        function readAnimationGroupId(element: Element): string | undefined {
+          if (!(element instanceof Element)) return undefined;
+          const owner = (element as HTMLElement).closest?.('[data-dh-anim-gid]');
+          if (!owner) return undefined;
+          const gid = owner.getAttribute('data-dh-anim-gid');
+          return gid && gid.length > 0 ? gid : undefined;
+        }
+
+        /** True when element carries any animation declaration (declared/css/animejs). */
+        function elementCarriesAnimation(element: Element): boolean {
+          if (!(element instanceof Element)) return false;
+          return (
+            element.hasAttribute('data-animation') ||
+            element.hasAttribute('data-dh-anim-css') ||
+            element.hasAttribute('data-dh-anim-anime')
+          );
+        }
+
+        /** Stamp a data-dh-anim-gid on a group root so descendants can inherit it. */
+        function stampAnimationGroupId(element: Element): string | undefined {
+          if (!(element instanceof Element)) return undefined;
+          if (element.hasAttribute('data-dh-anim-gid')) {
+            return element.getAttribute('data-dh-anim-gid') || undefined;
+          }
+          if (!elementCarriesAnimation(element)) return undefined;
+          const gid = readElementIdentity(element) ?? `dh-animroot-${++_animRootCounter}`;
+          element.setAttribute('data-dh-anim-gid', gid);
+          return gid;
         }
         /**
          * Check if element is a Font Awesome icon (helper for visibility check)
@@ -1554,6 +1595,7 @@ export class ElementInspector {
                 tag: 'svg',
                 elementId: readElementIdentity(svgEl),
                 animationRaw: readAnimationRaw(svgEl),
+                animationGroupId: readAnimationGroupId(svgEl),
                 ...layout,
                 styles,
               };
@@ -1588,6 +1630,7 @@ export class ElementInspector {
               src: `data:image/svg+xml;base64,${encoded}`,
               rasterMethod: 'svg-serialize',
               rasterReason: 'svg-diagram',
+              animationGroupId: readAnimationGroupId(svgEl),
             });
             markDomAsPptxMapped(svgEl);
           } catch (e) {
@@ -4944,6 +4987,10 @@ export class ElementInspector {
             }
           }
 
+          // Stamp animation group id on a group root before any info is emitted
+          // or children recursed, so descendants inherit it via closest().
+          stampAnimationGroupId(element);
+
           // const elementSelector = getElementSelector(element);
           // if (elementSelector === 'BODY > DIV.slide-container > HEADER > DIV.tag') {
           //   _debugInfo.push(`[DEBUG] Processing target element: ${elementSelector}`);
@@ -5062,6 +5109,7 @@ export class ElementInspector {
               mathDisplayMode: getMathDisplayMode(element),
               mathFallbackText: mathFallbackText || undefined,
               screenshotSelector: `[data-screenshot="${screenshotId}"]`,
+              animationGroupId: readAnimationGroupId(element),
             });
             markMathHostMapped(element);
             return;
@@ -5438,6 +5486,7 @@ export class ElementInspector {
             tag: tagWithMeta,
             elementId: readElementIdentity(element),
             animationRaw: readAnimationRaw(element),
+            animationGroupId: readAnimationGroupId(element),
             x: textRect.left,
             y: textRect.top,
             width: textRect.width,
@@ -5734,6 +5783,7 @@ export class ElementInspector {
               width: rect.width,
               height: rect.height,
               styles: getComputedStyles(element),
+              animationGroupId: readAnimationGroupId(element),
             };
             const clipFrame = computeClipPathIntersection(element, {
               x: frameShape.x,

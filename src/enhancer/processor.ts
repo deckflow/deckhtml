@@ -15,6 +15,7 @@ import { applyClipPathPolygonToXml } from './clip-path-polygon-xml';
 import { applyWritingModeToXml } from './writing-mode-xml';
 import { applyEquationToXml } from './equation-xml';
 import { applyAnimationTimingToXml } from './timing-xml';
+import { applyAnimationGroupToXml } from './animation-group-xml';
 import { stripUndeclaredWordMlFromSlide } from '../utils/omml-style';
 
 /**
@@ -42,9 +43,16 @@ export async function applyStyleEnhancements(
     // Read XML content
     let slideXml = await slideXmlFile.async('text');
 
-    // Get all enhancements for this slide, sorted by element index
+    // Get all enhancements for this slide, sorted by element index. The
+    // animationGroup enhancer must run before the animation enhancer so the
+    // wrapping <p:grpSp> already exists when p:timing resolves spids; enforce
+    // that with a secondary type-priority sort.
     const enhancements = registry.getForSlide(slideIndex)
-      .sort((a, b) => a.elementIndex - b.elementIndex);
+      .sort((a, b) => a.elementIndex - b.elementIndex)
+      .sort((a, b) => {
+        const pri = (t: string) => (t === 'animationGroup' ? 0 : t === 'animation' ? 1 : 2);
+        return pri(a.type) - pri(b.type);
+      });
 
     // Apply each enhancement
     for (const enhancement of enhancements) {
@@ -101,6 +109,8 @@ function applyEnhancement(slideXml: string, enhancement: StyleEnhancement): stri
       return applyEquationToXml(slideXml, enhancement);
     case 'animation':
       return applyAnimationTimingToXml(slideXml, enhancement);
+    case 'animationGroup':
+      return applyAnimationGroupToXml(slideXml, enhancement);
     case 'shadow':
       // Future implementation
       return slideXml;

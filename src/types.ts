@@ -192,6 +192,15 @@ export interface ElementInfo {
   /** Entrance animations declared on / captured from this element */
   animations?: ElementAnimation[];
   /**
+   * Id of the animation group this element belongs to (the nearest ancestor —
+   * or self — carrying a `data-animation` / CSS / anime.js declaration). The
+   * generator wraps all member shapes sharing the same id into one PPTX
+   * <p:grpSp> so the entrance animation targets the group as a whole, matching
+   * the HTML subtree-animation behaviour. Undefined when the element is not
+   * inside any animated subtree.
+   */
+  animationGroupId?: string;
+  /**
    * Raw animation capture produced inside the browser (declared attributes,
    * CSS capture key, intercepted anime.js call indices). Normalized into
    * `animations` on the Node side after inspection, then cleared.
@@ -492,6 +501,7 @@ export type StyleEnhancementType =
   | 'clipPathPolygon' // clip-path polygon ∩ element rect → custGeom
   | 'writingMode'   // CSS writing-mode → a:bodyPr @vert
   | 'equation'      // MathML → OMML in text box (a14:m)
+  | 'animationGroup' // Wrap sibling shapes from one animated DOM subtree into a <p:grpSp>
   | 'animation'     // Entrance animations → p:timing appended to slide XML
   | 'custom';       // Extensible
 
@@ -572,6 +582,13 @@ export interface StyleEnhancement {
   mathFallbackText?: string;
   /** Slide-level animation timing spec (type 'animation'; elementIndex unused) */
   animationData?: SlideAnimationSpec;
+  /**
+   * Slide-level animation-group spec (type 'animationGroup'; elementIndex
+   * unused). All shapes whose cNvPr @name equals `groupName` are wrapped into a
+   * single <p:grpSp> carrying that name, so the subsequent 'animation'
+   * enhancement resolves the group's spid and animates the whole subtree.
+   */
+  animationGroupData?: { groupName: string };
 }
 
 /**
