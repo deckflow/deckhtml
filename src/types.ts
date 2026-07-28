@@ -56,6 +56,24 @@ export interface ConversionOptions {
    * failures (ConversionError) instead of warnings.
    */
   strict?: StrictConversionOptions;
+  /**
+   * Entrance-animation export (default: enabled). Animations are captured from
+   * `data-animation*` declarations, CSS @keyframes and intercepted anime.js
+   * calls, then mapped onto the stable native PPTX subset (p:timing).
+   * Animations outside that subset keep the frozen end-state and emit
+   * DECKHTML_ANIMATION_UNMAPPED diagnostics. Pass `false` to disable.
+   */
+  animations?: boolean | AnimationConversionOptions;
+}
+
+export interface AnimationConversionOptions {
+  /**
+   * Trigger applied to captured (css/animejs) animations, which have no
+   * explicit trigger of their own. Declared animations use
+   * `data-animation-trigger` and fall back to this as well.
+   * Default: 'afterPrevious' (replays the HTML auto-play order).
+   */
+  defaultTrigger?: AnimationTrigger;
 }
 
 /**
@@ -76,6 +94,12 @@ export interface StrictConversionOptions {
   allowRemoteResources?: boolean;
   /** Hard fail when a declared font cannot be resolved. */
   failOnMissingFonts?: boolean;
+  /**
+   * Permit animations that cannot be mapped onto the native PPTX entrance
+   * subset (they keep the frozen end-state). In strict mode defaults to
+   * false: an unmapped animation is a hard failure.
+   */
+  allowUnmappedAnimations?: boolean;
 }
 
 export interface ElementInfo {
@@ -165,6 +189,63 @@ export interface ElementInfo {
   rasterMethod?: RasterMethod;
   /** Why native conversion was skipped (e.g. chart-canvas, svg-flowchart) */
   rasterReason?: RasterReason;
+  /** Entrance animations declared on / captured from this element */
+  animations?: ElementAnimation[];
+  /**
+   * Raw animation capture produced inside the browser (declared attributes,
+   * CSS capture key, intercepted anime.js call indices). Normalized into
+   * `animations` on the Node side after inspection, then cleared.
+   */
+  animationRaw?: ElementAnimationRaw;
+}
+
+/** Raw per-element animation capture carried across the browser/Node boundary. */
+export interface ElementAnimationRaw {
+  /** data-animation effect string (declared source) */
+  declaredEffect?: string;
+  /** data-animation-duration, already parsed to ms */
+  declaredDurationMs?: number;
+  /** data-animation-delay, already parsed to ms */
+  declaredDelayMs?: number;
+  /** data-animation-trigger verbatim (click|with|after) */
+  declaredTrigger?: string;
+  /** Key into the per-slide CSS animation capture map (css source) */
+  cssAnimationKey?: string;
+  /** CSS animation raw capture, resolved browser-side from the capture map */
+  cssRaw?: import('./animation/normalize').CssAnimationRaw;
+  /** Indices into the intercepted anime.js call log (animejs source) */
+  animeCallIndices?: number[];
+  /** Intercepted anime.js calls, resolved browser-side from the call log */
+  animeRaws?: import('./animation/normalize').AnimeCallRaw[];
+}
+
+/** Where an element animation declaration was obtained from. */
+export type AnimationSource = 'declared' | 'css' | 'animejs';
+
+/** PPTX timing trigger for an animation node. */
+export type AnimationTrigger = 'onClick' | 'withPrevious' | 'afterPrevious';
+
+/**
+ * Animation effect normalized onto the cross-player stable PPTX subset
+ * (p:set visibility, p:animEffect fade/wipe, p:anim ppt_x/y/w/h, p:animRot).
+ * `unmapped` animations keep the frozen end-state and surface a diagnostic
+ * instead of entering p:timing.
+ */
+export type NormalizedAnimationEffect =
+  | { kind: 'appear' }
+  | { kind: 'fade' }
+  | { kind: 'fly'; direction: 'left' | 'right' | 'top' | 'bottom' }
+  | { kind: 'zoom' }
+  | { kind: 'spin'; angleDeg?: number }
+  | { kind: 'wipe'; direction: 'left' | 'right' | 'top' | 'bottom' }
+  | { kind: 'unmapped'; raw: string; reason: string };
+
+export interface ElementAnimation {
+  source: AnimationSource;
+  effect: NormalizedAnimationEffect;
+  trigger: AnimationTrigger;
+  durationMs: number;
+  delayMs: number;
 }
 
 /** Rasterization method used when native PPTX conversion is skipped */
@@ -411,6 +492,7 @@ export type StyleEnhancementType =
   | 'clipPathPolygon' // clip-path polygon ∩ element rect → custGeom
   | 'writingMode'   // CSS writing-mode → a:bodyPr @vert
   | 'equation'      // MathML → OMML in text box (a14:m)
+  | 'animation'     // Entrance animations → p:timing appended to slide XML
   | 'custom';       // Extensible
 
 // Element record that needs post-processing
@@ -488,6 +570,23 @@ export interface StyleEnhancement {
   mathSzHalfPt?: number;
   mathJc?: 'left' | 'center' | 'right';
   mathFallbackText?: string;
+  /** Slide-level animation timing spec (type 'animation'; elementIndex unused) */
+  animationData?: SlideAnimationSpec;
+}
+
+/**
+ * Per-slide animation timing: each entry binds one shape (looked up via the
+ * objectName written into cNvPr @name) to its mapped animation sequence.
+ */
+export interface SlideAnimationSpec {
+  entries: AnimationTimingEntry[];
+}
+
+export interface AnimationTimingEntry {
+  /** Value of cNvPr @name used to resolve the numeric spid for p:spTgt. */
+  objectName: string;
+  /** Mapped effects only; unmapped ones were already reported as diagnostics. */
+  animations: ElementAnimation[];
 }
 
 // Gradient data

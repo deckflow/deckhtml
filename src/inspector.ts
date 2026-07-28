@@ -705,9 +705,184 @@ export class ElementInspector {
         minW,
       }
     );
+    await this.captureCssAnimations(slideSelector);
     await this.prepareSlideContainerForInspect(slideSelector, discovery);
     await this.waitForLayoutSettle();
     await this.waitForSlideAnimationSettle();
+  }
+
+  /**
+   * Capture CSS animation declarations (computed animation-* props + @keyframes
+   * first/last frames) before styles are frozen for inspection. Elements get a
+   * data-dh-anim-css marker; raw data lives on window.__deckhtmlCssAnimations
+   * and is folded into animationRaw.cssRaw by readAnimationRaw during inspect.
+   */
+  private async captureCssAnimations(slideSelector?: string): Promise<void> {
+    await this.page
+      .evaluate((rootSel) => {
+        const WIN_KEY = '__deckhtmlCssAnimations';
+        const MARK_ATTR = 'data-dh-anim-css';
+        (window as any)[WIN_KEY] = {};
+
+        const parseCssTime = (v: string): number => {
+          const m = v.trim().match(/^(-?\d+(?:\.\d+)?)(ms|s)?$/);
+          if (!m) return 0;
+          const n = parseFloat(m[1]);
+          if (isNaN(n) || n < 0) return 0;
+          return m[2] === 's' ? Math.round(n * 1000) : Math.round(n);
+        };
+
+        const parseTransformMotion = (transform: string) => {
+          const motion = {
+            translateXPx: 0,
+            translateYPx: 0,
+            scaleX: 1,
+            scaleY: 1,
+            rotateDeg: 0,
+          };
+          const t = (transform || '').trim();
+          if (!t || t === 'none') return motion;
+          const len = (v: string): number => {
+            const n = parseFloat(v);
+            return isNaN(n) ? 0 : n; // px units; percentages treated as px (approximation)
+          };
+          if (/^matrix3?\(/.test(t)) {
+            try {
+              const m = new DOMMatrix(t);
+              motion.translateXPx = m.e;
+              motion.translateYPx = m.f;
+              motion.scaleX = Math.sqrt(m.a * m.a + m.b * m.b) || 1;
+              motion.scaleY = Math.sqrt(m.c * m.c + m.d * m.d) || 1;
+              motion.rotateDeg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+              return motion;
+            } catch {
+              return motion;
+            }
+          }
+          const fn = /([a-zA-Z0-9]+)\(([^)]*)\)/g;
+          let m: RegExpExecArray | null;
+          while ((m = fn.exec(t)) !== null) {
+            const name = m[1];
+            const args = m[2].split(',').map((s) => s.trim());
+            switch (name) {
+              case 'translate':
+              case 'translate3d':
+                motion.translateXPx += len(args[0] ?? '0');
+                motion.translateYPx += len(args[1] ?? '0');
+                break;
+              case 'translateX':
+                motion.translateXPx += len(args[0] ?? '0');
+                break;
+              case 'translateY':
+                motion.translateYPx += len(args[0] ?? '0');
+                break;
+              case 'scale':
+              case 'scale3d': {
+                const sx = parseFloat(args[0] ?? '1');
+                const sy = parseFloat(args[1] ?? args[0] ?? '1');
+                if (!isNaN(sx)) motion.scaleX *= sx;
+                if (!isNaN(sy)) motion.scaleY *= sy;
+                break;
+              }
+              case 'scaleX': {
+                const s = parseFloat(args[0] ?? '1');
+                if (!isNaN(s)) motion.scaleX *= s;
+                break;
+              }
+              case 'scaleY': {
+                const s = parseFloat(args[0] ?? '1');
+                if (!isNaN(s)) motion.scaleY *= s;
+                break;
+              }
+              case 'rotate':
+              case 'rotateZ': {
+                const deg = parseFloat(args[0] ?? '0');
+                if (!isNaN(deg)) motion.rotateDeg += deg;
+                break;
+              }
+              default:
+                break;
+            }
+          }
+          return motion;
+        };
+
+        const parseKeyframeFrame = (cssText: string) => {
+          const open = cssText.indexOf('{');
+          const close = cssText.lastIndexOf('}');
+          const body = open >= 0 && close > open ? cssText.slice(open + 1, close) : '';
+          const holder = document.createElement('div');
+          holder.style.cssText = body;
+          const s = holder.style;
+          const opacity = s.opacity === '' ? null : parseFloat(s.opacity);
+          let hasNonMotionProps = false;
+          for (let i = 0; i < s.length; i++) {
+            const prop = s[i];
+            if (prop !== 'opacity' && prop !== 'transform') {
+              hasNonMotionProps = true;
+              break;
+            }
+          }
+          return { opacity, ...parseTransformMotion(s.transform || ''), hasNonMotionProps };
+        };
+
+        // Index @keyframes rules (Chromium maps -webkit-keyframes to type 7 too).
+        const keyframes = new Map<string, { first: string | null; last: string | null }>();
+        for (const sheet of Array.from(document.styleSheets)) {
+          let rules: CSSRuleList | null = null;
+          try {
+            rules = sheet.cssRules;
+          } catch {
+            continue; // cross-origin sheet
+          }
+          if (!rules) continue;
+          for (const rule of Array.from(rules)) {
+            if ((rule as CSSRule).type !== CSSRule.KEYFRAMES_RULE) continue;
+            const kfRule = rule as CSSKeyframesRule;
+            const frames: { first: string | null; last: string | null } = {
+              first: null,
+              last: null,
+            };
+            for (const kf of Array.from(kfRule.cssRules)) {
+              const keyframe = kf as CSSKeyframeRule;
+              const keys = keyframe.keyText.split(',').map((s: string) => s.trim());
+              if (keys.some((k: string) => k === 'from' || k === '0%')) frames.first = keyframe.cssText;
+              if (keys.some((k: string) => k === 'to' || k === '100%')) frames.last = keyframe.cssText;
+            }
+            keyframes.set(kfRule.name, frames);
+          }
+        }
+        if (keyframes.size === 0) return;
+
+        const root = rootSel ? document.querySelector(rootSel) : document.body;
+        if (!root) return;
+        const elements: Element[] = [root, ...Array.from(root.querySelectorAll('*'))];
+        let seq = 0;
+        const captured: Record<string, unknown> = {};
+        for (const el of elements) {
+          if (!(el instanceof HTMLElement || el instanceof SVGElement)) continue;
+          const cs = window.getComputedStyle(el);
+          const nameList = cs.animationName;
+          if (!nameList || nameList === 'none') continue;
+          const name = nameList.split(',')[0]!.trim();
+          const frames = keyframes.get(name);
+          if (!frames || !frames.first || !frames.last) continue;
+          const iterStr = cs.animationIterationCount.split(',')[0]!.trim();
+          const raw = {
+            name,
+            durationMs: parseCssTime(cs.animationDuration.split(',')[0] ?? ''),
+            delayMs: parseCssTime(cs.animationDelay.split(',')[0] ?? ''),
+            iterationCount: iterStr === 'infinite' ? null : parseFloat(iterStr) || 1,
+            first: parseKeyframeFrame(frames.first),
+            last: parseKeyframeFrame(frames.last),
+          };
+          const key = String(seq++);
+          el.setAttribute(MARK_ATTR, key);
+          captured[key] = raw;
+        }
+        (window as any)[WIN_KEY] = captured;
+      }, slideSelector ?? null)
+      .catch(() => {});
   }
 
   /** Scroll-reveal hooks leave `.reveal` at opacity:0 until scrolled; fix before inspect. */
@@ -1195,6 +1370,9 @@ export class ElementInspector {
     options?: InspectElementsOptions
   ): Promise<ElementInfo[]> {
     const inputIsSvg = options?.inputIsSvg ?? false;
+    // Single-page path: capture CSS animation declarations before inspection.
+    // (Multi-slide paths capture per slide inside isolateOutsideSlideContainer.)
+    await this.captureCssAnimations(slideSelector);
     const elements = await this.page.evaluate(
       async ({ slideSelector, slideHeight, inputIsSvg, excludeSelector, slideIdAttribute, identityAttribute }) => {
         const result: any[] = [];
@@ -1223,6 +1401,62 @@ export class ElementInspector {
             _seenElementIds.set(id, 1);
           }
           return id;
+        }
+
+        /** Parse "600" | "600ms" | "0.6s" into milliseconds. */
+        function parseAnimTimeMs(v: string | null): number | undefined {
+          if (!v) return undefined;
+          const m = String(v).trim().match(/^(-?\d+(?:\.\d+)?)(ms|s)?$/);
+          if (!m) return undefined;
+          const n = parseFloat(m[1]);
+          if (isNaN(n) || n < 0) return undefined;
+          return m[2] === 's' ? Math.round(n * 1000) : Math.round(n);
+        }
+
+        /**
+         * Read raw animation capture for an element: explicit data-animation*
+         * declaration, CSS capture key (data-dh-anim-css, stamped before styles
+         * are frozen) and intercepted anime.js call indices (data-dh-anim-anime).
+         * Normalized into ElementInfo.animations on the Node side.
+         */
+        function readAnimationRaw(element: Element): any | undefined {
+          if (!(element instanceof Element)) return undefined;
+          const raw: any = {};
+          const effect = element.getAttribute('data-animation');
+          if (effect && effect.trim()) {
+            raw.declaredEffect = effect.trim();
+            const dur = parseAnimTimeMs(element.getAttribute('data-animation-duration'));
+            if (dur !== undefined) raw.declaredDurationMs = dur;
+            const delay = parseAnimTimeMs(element.getAttribute('data-animation-delay'));
+            if (delay !== undefined) raw.declaredDelayMs = delay;
+            const trigger = element.getAttribute('data-animation-trigger');
+            if (trigger && trigger.trim()) raw.declaredTrigger = trigger.trim();
+          }
+          const cssKey = element.getAttribute('data-dh-anim-css');
+          if (cssKey) {
+            raw.cssAnimationKey = cssKey;
+            const cssMap = (window as any).__deckhtmlCssAnimations;
+            const cssRaw = cssMap && typeof cssMap === 'object' ? cssMap[cssKey] : undefined;
+            if (cssRaw) raw.cssRaw = cssRaw;
+          }
+          const animeIdx = element.getAttribute('data-dh-anim-anime');
+          if (animeIdx) {
+            const indices = animeIdx
+              .split(',')
+              .map((s) => parseInt(s, 10))
+              .filter((n) => !isNaN(n));
+            if (indices.length) {
+              raw.animeCallIndices = indices;
+              const animeCalls = (window as any).__deckhtmlAnimeCalls;
+              if (Array.isArray(animeCalls)) {
+                const raws = indices
+                  .map((i) => animeCalls[i])
+                  .filter((c) => c && typeof c === 'object');
+                if (raws.length) raw.animeRaws = raws;
+              }
+            }
+          }
+          return Object.keys(raw).length > 0 ? raw : undefined;
         }
         /**
          * Check if element is a Font Awesome icon (helper for visibility check)
@@ -1319,6 +1553,7 @@ export class ElementInspector {
                 type: 'image',
                 tag: 'svg',
                 elementId: readElementIdentity(svgEl),
+                animationRaw: readAnimationRaw(svgEl),
                 ...layout,
                 styles,
               };
@@ -5202,6 +5437,7 @@ export class ElementInspector {
             type,
             tag: tagWithMeta,
             elementId: readElementIdentity(element),
+            animationRaw: readAnimationRaw(element),
             x: textRect.left,
             y: textRect.top,
             width: textRect.width,

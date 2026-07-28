@@ -35,6 +35,7 @@ import { embedFontAwesomeFonts } from './utils/fa-font-embedder';
 import { buildElementStats, buildFontStats, buildSimplifiedStats, recomputeSummary } from './conversion-report';
 import { DiagnosticsCollector, ConversionError, RULE_IDS, type Diagnostic } from './utils/diagnostics';
 import { verifyOoxml } from './utils/ooxml-verify';
+import { applyAnimationsToElements } from './animation/apply';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -184,6 +185,7 @@ interface ProcessSingleInputResult {
   slidesMap: Map<number, ElementInfo[]>;
   slideCoordsNormalized: boolean;
   excludedCount: number;
+  animationDiagnostics: import('./utils/diagnostics').Diagnostic[];
 }
 
 interface ProcessSingleInputRuntime {
@@ -331,7 +333,22 @@ async function processSingleInput(
       );
     }
 
-    return { slidesMap, slideCoordsNormalized, excludedCount: excludedCounter.value };
+    const animationDiagnostics: import('./utils/diagnostics').Diagnostic[] = [];
+    for (const [slideIndex, elements] of slidesMap) {
+      animationDiagnostics.push(
+        ...applyAnimationsToElements(elements, {
+          animationsOption: options.animations,
+          slideId: String(slideIndex + 1),
+        })
+      );
+    }
+
+    return {
+      slidesMap,
+      slideCoordsNormalized,
+      excludedCount: excludedCounter.value,
+      animationDiagnostics,
+    };
   } finally {
     await loader.close().catch(() => {});
   }
@@ -446,6 +463,7 @@ function resolveStrictConfig(
     allowUnsupported: strict.allowUnsupported ?? false,
     allowRemoteResources: strict.allowRemoteResources ?? false,
     failOnMissingFonts: strict.failOnMissingFonts ?? true,
+    allowUnmappedAnimations: strict.allowUnmappedAnimations ?? false,
   };
 }
 
@@ -462,8 +480,9 @@ function enforceStrictMode(args: {
   resourceDiagnostics: import('./utils/resource-policy').ResourceDiagnostic[];
   fontStats: import('./conversion-report').ConversionFontStats;
   identityDiagnostics: Diagnostic[];
+  animationDiagnostics: Diagnostic[];
 }): never | void {
-  const { strict, report, resourceDiagnostics, fontStats, identityDiagnostics } = args;
+  const { strict, report, resourceDiagnostics, fontStats, identityDiagnostics, animationDiagnostics } = args;
   const failures: Diagnostic[] = [];
 
   // requireElementIdentity: every converted semantic element must declare an identity.
@@ -510,6 +529,22 @@ function enforceStrictMode(args: {
         severity: 'error',
         message: `strict mode: ${report.summary.unsupported} element(s) are unsupported. Set strict.allowUnsupported=true to permit unsupported kinds.`,
         recovery: 'Replace unsupported elements with text/image/shape/table/group, or set strict.allowUnsupported=true.',
+      });
+    }
+  }
+
+  // allowUnmappedAnimations: every declared/captured animation must map onto
+  // the native PPTX entrance subset.
+  if (!strict.allowUnmappedAnimations) {
+    const unmapped = animationDiagnostics.filter(
+      (d) => d.rule_id === RULE_IDS.ANIMATION_UNMAPPED,
+    );
+    if (unmapped.length > 0) {
+      failures.push({
+        rule_id: RULE_IDS.ANIMATION_UNMAPPED,
+        severity: 'error',
+        message: `strict mode: ${unmapped.length} animation(s) could not be mapped onto the native PPTX entrance subset. First: ${unmapped[0]!.message}`,
+        recovery: 'Use a supported entrance effect (fade-in, fly-in-*, zoom-in, spin, wipe-*, appear), or set strict.allowUnmappedAnimations=true.',
       });
     }
   }
@@ -661,6 +696,7 @@ export async function convertHtmlToPptx(
 
     const inspectConcurrency = resolveSlideInspectConcurrency();
     let totalExcludedCount = 0;
+    const animationDiagnostics: Diagnostic[] = [];
   const parallelInputs = inputPaths.length > 1 && inspectConcurrency > 1;
   if (parallelInputs) {
     const fileConcurrency = Math.min(inspectConcurrency, inputPaths.length);
@@ -710,6 +746,7 @@ export async function convertHtmlToPptx(
     for (const { result } of completed) {
       slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
       totalExcludedCount += result.excludedCount;
+      animationDiagnostics.push(...result.animationDiagnostics);
       slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
     }
   } else {
@@ -732,6 +769,7 @@ export async function convertHtmlToPptx(
       );
       slideCoordsNormalized = slideCoordsNormalized || result.slideCoordsNormalized;
       totalExcludedCount += result.excludedCount;
+      animationDiagnostics.push(...result.animationDiagnostics);
       slideOffset = mergeSlidesMaps(mergedSlidesMap, result.slidesMap, slideOffset);
     }
   }
@@ -747,6 +785,7 @@ export async function convertHtmlToPptx(
   });
   generator.report.ignoredCount = totalExcludedCount;
   for (const d of identityDiagnostics) generator.report.diagnostics.push(d);
+  for (const d of animationDiagnostics) generator.report.diagnostics.push(d);
   for (const d of resourceDiagnostics) {
     generator.report.diagnostics.push({
       rule_id: d.rule_id,
@@ -769,6 +808,7 @@ export async function convertHtmlToPptx(
   // Aggregate unified diagnostics (DH-P0-009): identity + resource + report-level.
   const unifiedDiagnostics = new DiagnosticsCollector();
   unifiedDiagnostics.pushMany(identityDiagnostics);
+  unifiedDiagnostics.pushMany(animationDiagnostics);
   for (const d of resourceDiagnostics) {
     unifiedDiagnostics.push({
       rule_id: d.rule_id,
@@ -805,6 +845,7 @@ export async function convertHtmlToPptx(
       resourceDiagnostics,
       fontStats,
       identityDiagnostics,
+      animationDiagnostics,
     });
     // DH-P0-010: in strict mode, OOXML self-check errors are hard failures.
     const ooxmlErrors = ooxmlDiagnostics.filter((d) => d.severity === 'error');

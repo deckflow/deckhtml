@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Animation fixture</title>
+<style>
+  body { margin: 0; width: 1280px; height: 720px; background: #10243a; font-family: Arial, sans-serif; }
+  .slide { position: relative; width: 1280px; height: 720px; }
+  h1 {
+    position: absolute; left: 90px; top: 80px; margin: 0;
+    color: #ffffff; font-size: 56px;
+  }
+  .card {
+    position: absolute; left: 90px; top: 260px; width: 480px; height: 180px;
+    background: #2f7cf6; border-radius: 16px; color: #fff;
+    font-size: 28px; display: flex; align-items: center; justify-content: center;
+  }
+  .badge {
+    position: absolute; left: 660px; top: 300px; width: 220px; height: 100px;
+    background: #ffb020; border-radius: 50px; color: #10243a;
+    font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+  }
+  .footnote {
+    position: absolute; left: 90px; top: 600px; color: #9fb3c8; font-size: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-01">
+  <h1 data-element-id="anim-title"
+      data-animation="fade-in"
+      data-animation-duration="600"
+      data-animation-trigger="click">DeckHTML Animations</h1>
+
+  <div class="card" data-element-id="anim-card"
+       data-animation="fly-in-left"
+       data-animation-duration="800">Fly in from left</div>
+
+  <div class="badge" data-animation="zoom-in"
+       data-animation-duration="500"
+       data-animation-trigger="after">Zoom badge</div>
+
+  <p class="footnote" data-animation="spin-half"
+     data-animation-trigger="with">Spin + wipe footnote</p>
+</div>
+</body>
+</html>

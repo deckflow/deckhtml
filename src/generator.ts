@@ -4,7 +4,7 @@
  */
 
 import PptxGenJS from 'pptxgenjs';
-import { ElementInfo, UsedFontDescriptor } from './types';
+import { ElementAnimation, ElementInfo, SlideAnimationSpec, UsedFontDescriptor } from './types';
 import { ElementConverter } from './converter';
 import { SLIDE_WIDTH_INCH, SLIDE_HEIGHT_INCH, getSlideHeightPx } from './utils/coordinate';
 import { PlatformFontContext } from './utils/platformFontMap';
@@ -39,6 +39,8 @@ export class PPTXGenerator {
   private slideSelector?: string;
   private slideCoordsNormalized: boolean;
   private registry: StyleEnhancementRegistry;
+  /** Per-slide animation timing specs, registered as enhancements in generate(). */
+  private animationSpecs = new Map<number, SlideAnimationSpec>();
   /** Per-element report collector (DH-P0-002). */
   readonly report = new ReportCollector();
 
@@ -77,6 +79,16 @@ export class PPTXGenerator {
       const elements = slidesMap.get(slideIndex);
       if (!elements || elements.length === 0) continue;
       await this.createSlide(elements, slideIndex);
+    }
+
+    // Register one aggregated animation enhancement per animated slide
+    for (const [slideIndex, spec] of this.animationSpecs) {
+      this.registry.register({
+        slideIndex,
+        elementIndex: 0,
+        type: 'animation',
+        animationData: spec,
+      });
     }
 
     // Phase 2: Apply style enhancements if needed
@@ -424,6 +436,23 @@ export class PPTXGenerator {
             (converted.options as any).objectName = element.elementId;
           }
 
+          // Animations: the object needs a name the p:timing injector can
+          // resolve to a spid. Elements without a caller identity get a
+          // deterministic internal name; the per-slide spec is aggregated and
+          // registered as a single enhancement in generate().
+          if (
+            element.animations &&
+            element.animations.length > 0 &&
+            converted.options &&
+            typeof converted.options === 'object'
+          ) {
+            const objectName = element.elementId ?? `dh-anim-${slideIndex}-${elementIndex}`;
+            if (!element.elementId) {
+              (converted.options as any).objectName = objectName;
+            }
+            this.registerAnimationEntry(slideIndex, objectName, element.animations);
+          }
+
           await this.addElementToSlide(slide, converted, currentShapeIndex);
 
           // DH-P0-002: record this element in the per-element report.
@@ -440,6 +469,37 @@ export class PPTXGenerator {
       }
     }
     console.log(`Slide ${slideIndex + 1}: Added ${elementCount} source elements (${elementIndex} total elements)`);
+  }
+
+  /**
+   * Aggregate one element's animations into the per-slide timing spec.
+   * A DOM element split into several PPTX shapes (shape background + text
+   * box) carries its animationRaw on each ElementInfo; entries are merged by
+   * objectName and identical effects deduped so the animation plays once.
+   */
+  private registerAnimationEntry(
+    slideIndex: number,
+    objectName: string,
+    animations: ElementAnimation[]
+  ): void {
+    let spec = this.animationSpecs.get(slideIndex);
+    if (!spec) {
+      spec = { entries: [] };
+      this.animationSpecs.set(slideIndex, spec);
+    }
+    let entry = spec.entries.find((e) => e.objectName === objectName);
+    if (!entry) {
+      entry = { objectName, animations: [] };
+      spec.entries.push(entry);
+    }
+    for (const animation of animations) {
+      const key = `${animation.trigger}|${animation.durationMs}|${animation.delayMs}|${JSON.stringify(animation.effect)}`;
+      const dup = entry.animations.some(
+        (a) =>
+          `${a.trigger}|${a.durationMs}|${a.delayMs}|${JSON.stringify(a.effect)}` === key
+      );
+      if (!dup) entry.animations.push(animation);
+    }
   }
 
   /**

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>anime.js fixture</title>
+<script src="vendor/anime.min.js"></script>
+<style>
+  body { margin: 0; width: 1280px; height: 720px; background: #1a1a2e; font-family: Arial, sans-serif; }
+  .slide { position: relative; width: 1280px; height: 720px; }
+  h1 { position: absolute; left: 90px; top: 90px; margin: 0; color: #fff; font-size: 54px; }
+  .box {
+    position: absolute; left: 90px; top: 280px; width: 300px; height: 140px;
+    background: #e94560; border-radius: 14px; color: #fff; font-size: 24px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ball {
+    position: absolute; left: 520px; top: 300px; width: 110px; height: 110px;
+    background: #0fdbc0; border-radius: 50%;
+  }
+  .note { position: absolute; left: 90px; top: 540px; color: #9fb3c8; font-size: 22px; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anime-01">
+  <h1 data-element-id="anime-title">anime.js deck</h1>
+  <div class="box" id="box1">fade + fly</div>
+  <div class="ball" id="ball1"></div>
+  <p class="note" id="note1">rotate entrance</p>
+</div>
+<script>
+  // fade in from opacity 0
+  anime({
+    targets: '#box1',
+    opacity: [0, 1],
+    translateX: [-260, 0],
+    duration: 800,
+    easing: 'easeOutQuad'
+  });
+  // zoom in
+  anime({
+    targets: document.getElementById('ball1'),
+    scale: [0, 1],
+    duration: 600
+  });
+  // rotate in
+  anime({
+    targets: '#note1',
+    rotate: [-90, 0],
+    opacity: [0, 1],
+    duration: 700
+  });
+</script>
+</body>
+</html>

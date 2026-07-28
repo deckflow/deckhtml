@@ -138,6 +138,29 @@ export async function verifyOoxml(
     }
   }
 
+  // 6. Animation timing closure: every spid referenced by p:timing (spTgt/bldP)
+  // must exist as a cNvPr @id in the same slide XML. A dangling reference
+  // makes PowerPoint show the "repair" prompt.
+  for (const entry of slideEntries) {
+    const xml = await zip.files[entry]!.async('string');
+    if (!xml.includes('<p:timing>')) continue;
+    const shapeIds = new Set(
+      [...xml.matchAll(/<p:cNvPr\s+id="(\d+)"/g)].map((m) => m[1]!),
+    );
+    const referenced = new Set<string>();
+    for (const m of xml.matchAll(/<p:spTgt\s+spid="(\d+)"/g)) referenced.add(m[1]!);
+    for (const m of xml.matchAll(/<p:bldP\s+spid="(\d+)"/g)) referenced.add(m[1]!);
+    const dangling = [...referenced].filter((id) => !shapeIds.has(id));
+    if (dangling.length > 0) {
+      diagnostics.push({
+        rule_id: RULE_IDS.OOXML_WRITE_FAILURE,
+        severity: 'error',
+        message: `Animation timing in ${entry} references missing shape id(s): ${dangling.join(', ')}.`,
+        recovery: 'Report this as an engine bug; p:timing spTgt references are not closed.',
+      });
+    }
+  }
+
   const ok = !diagnostics.some((d) => d.severity === 'error');
   return { ok, diagnostics, packageSlideCount, hasFullPageImage, hasRemoteRelationship };
 }

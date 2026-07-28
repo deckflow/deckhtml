@@ -14,6 +14,7 @@ import { applyGlowToXml } from './glow-xml';
 import { applyClipPathPolygonToXml } from './clip-path-polygon-xml';
 import { applyWritingModeToXml } from './writing-mode-xml';
 import { applyEquationToXml } from './equation-xml';
+import { applyAnimationTimingToXml } from './timing-xml';
 import { stripUndeclaredWordMlFromSlide } from '../utils/omml-style';
 
 /**
@@ -98,6 +99,8 @@ function applyEnhancement(slideXml: string, enhancement: StyleEnhancement): stri
       return applyWritingModeToXml(slideXml, enhancement);
     case 'equation':
       return applyEquationToXml(slideXml, enhancement);
+    case 'animation':
+      return applyAnimationTimingToXml(slideXml, enhancement);
     case 'shadow':
       // Future implementation
       return slideXml;

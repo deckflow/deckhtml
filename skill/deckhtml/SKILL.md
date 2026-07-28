@@ -79,6 +79,7 @@ npx -y @deckflow/deckhtml@latest 01.html 02.html 03.html -o deck.pptx --mode loc
 - Charts/canvas: local embeds rasterized canvas; for editable charts use `--mode cloud --rebuild-chart`
 - Local images: relative paths work in local mode (`allowLocalResources`); keep assets next to the HTML
 - Avoid relying on hover-only state; ensure the visible slide state is in the DOM at capture time
+- Entrance animations: declare with `data-animation="fade-in"` (+ `data-animation-duration/delay/trigger`) for real PPTX animations; single-shot CSS `@keyframes` (opacity/translate/scale/rotate) and global anime.js calls are mapped automatically. Details: [references/animations.md](references/animations.md)
 
 **Start from the full template** (title / bullets / two-column / KPIs):
 
@@ -179,5 +180,6 @@ Requires peer deps: `playwright-core`, `pptxgenjs`. Local API is PPTX-only.
 - [examples.md](examples.md) — copy-paste command recipes
 - [references/cli.md](references/cli.md) — flags, modes, auth
 - [references/html-authoring.md](references/html-authoring.md) — slide HTML conventions
+- [references/animations.md](references/animations.md) — entrance-animation declarations, CSS/anime.js mapping, triggers
 - [references/output-contract.md](references/output-contract.md) — JSON / report / exit codes
 - [references/troubleshooting.md](references/troubleshooting.md) — common failures

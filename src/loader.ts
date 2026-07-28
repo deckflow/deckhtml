@@ -23,6 +23,7 @@ import { chromium, Browser, Page, BrowserContext } from 'playwright-core';
 import { getSlideWidthPx, getSlideHeightPx } from './utils/coordinate';
 import { setupResourcePolicyOnPage } from './utils/resource-policy';
 import { gotoAndSettle } from './utils/navigate';
+import { installAnimeInterceptor } from './animation/anime-interceptor';
 
 /** Caller-controlled browser launch options. */
 export interface BrowserLaunchOptions {
@@ -287,6 +288,7 @@ export class HTMLLoader {
     const w = viewport?.width ?? getSlideWidthPx();
     const h = viewport?.height ?? getSlideHeightPx();
     await page.setViewportSize({ width: w, height: h });
+    await installAnimeInterceptor(page);
 
     const { documentUrl } = await setupResourcePolicyOnPage(page, inputPath, {
       allowLocalResources: options?.allowLocalResources,

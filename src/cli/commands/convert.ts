@@ -49,6 +49,8 @@ export interface ConvertOptions {
   exclude?: string;
   identityAttribute?: string;
   force?: boolean;
+  /** commander --no-animations sets this to false (default true). */
+  animations?: boolean;
 }
 
 function resolvePlatformOption(platform?: string): PlatformTarget {
@@ -95,7 +97,8 @@ async function runLocalConvert(
   executablePath?: string,
   force?: boolean,
   excludeSelector?: string,
-  identityAttribute?: string
+  identityAttribute?: string,
+  animations?: boolean
 ): Promise<ConversionResultEnvelope> {
   if (format === 'png') {
     logVerbose(
@@ -174,6 +177,7 @@ async function runLocalConvert(
     platform,
     excludeSelector,
     identityAttribute,
+    animations,
     browser: executablePath ? { executablePath } : undefined,
   });
 
@@ -328,6 +332,10 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       'Overwrite an existing output file instead of refusing (default: refuse)',
       false
     )
+    .option(
+      '--no-animations',
+      'Disable entrance-animation export (data-animation*, CSS @keyframes, anime.js interception)'
+    )
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {
         return;
@@ -392,7 +400,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               options.executablePath,
               options.force,
               options.exclude,
-              options.identityAttribute
+              options.identityAttribute,
+              options.animations
             );
           }
 

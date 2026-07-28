@@ -27,6 +27,17 @@
 - Isolation hid siblings incorrectly → ensure each slide is a self-contained host
 - Animations not finished → content should not depend on mid-animation; stacked decks wait ~3s after isolation
 
+## Animations not exported
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| No animations at all in the PPTX | `--no-animations` passed, or no mappable animation found | Drop the flag; check `--report` diagnostics |
+| `DECKHTML_ANIMATION_UNMAPPED` in report | Effect outside the native subset (infinite loop, compound motion+rotate, color/size keyframes, stagger, motion path) | Use a supported entrance effect; see [animations.md](animations.md) |
+| anime.js animation missing | anime.js imported as ES module — interception only sees the `window.anime` / `window.animejs` globals | Use the UMD build, or declare with `data-animation` |
+| CSS animation missing | `@keyframes` in a cross-origin stylesheet, or it is a `transition`, or infinite `iteration-count` | Inline the CSS; use a single-shot `animation`; declare explicitly |
+| Animation plays but order/timing differs | Easing curves are dropped; captured animations default to `afterPrevious` in DOM order | Set `data-animation-trigger` or API `animations.defaultTrigger` |
+| Strict mode fails on animation | `strict.allowUnmappedAnimations` defaults to `false` | Map to a supported effect, or set `allowUnmappedAnimations: true` |
+
 ## Layout / clipping
 
 - Design width ≠ viewport → pass `--width` matching the CSS slide width
