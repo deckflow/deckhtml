@@ -246,6 +246,15 @@ async function runCloudConvert(
       : await deck.convertHtmlToPptx(taskInput);
 
   logProgress(ctx.quiet, `Task created: ${task.id}`);
+
+  // Guest mode (no token/api-key): the backend parks the task in pending and
+  // waits for an explicit start. If create triggered 401 → login → retry,
+  // credentials are now set and authenticated tasks auto-start.
+  if (!ctx.hasCredentials()) {
+    logProgress(ctx.quiet, 'Starting guest task...');
+    await deck.tasks.start(task.id);
+  }
+
   logProgress(ctx.quiet, 'Converting...');
 
   const completed = await deck.tasks.wait(task.id, {

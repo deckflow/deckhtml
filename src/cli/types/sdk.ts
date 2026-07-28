@@ -13,6 +13,7 @@ export interface DeckClient {
   convertHtmlToPptx(params: Record<string, unknown>): Promise<DeckTask>;
   convertHtmlToPng(params: Record<string, unknown>): Promise<DeckTask>;
   tasks: {
+    start(taskId: string): Promise<DeckTask>;
     wait(
       taskId: string,
       options?: {

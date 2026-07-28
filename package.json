@@ -1,6 +1,6 @@
 {
   "name": "@deckflow/deckhtml",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Convert HTML to PPTX or PNG presentations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -42,7 +42,7 @@
   "homepage": "https://github.com/deckflow/deckhtml#readme",
   "license": "MIT",
   "dependencies": {
-    "@deckops/sdk": "^0.7.2",
+    "@deckops/sdk": "^0.7.3",
     "chrome-launcher": "^1.2.1",
     "commander": "^11.1.0",
     "jszip": "^3.10.1",
