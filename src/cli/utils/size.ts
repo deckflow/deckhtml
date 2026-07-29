@@ -1,5 +1,9 @@
-export const DEFAULT_VIEWPORT_WIDTH = 1280;
-export const DEFAULT_VIEWPORT_HEIGHT = 720;
+import {
+  DEFAULT_VIEWPORT_HEIGHT,
+  DEFAULT_VIEWPORT_WIDTH,
+} from '../../utils/viewport';
+
+export { DEFAULT_VIEWPORT_WIDTH, DEFAULT_VIEWPORT_HEIGHT };
 
 export function parseWidth(value: string): number {
   const width = parseInt(value, 10);
@@ -12,7 +16,8 @@ export function parseWidth(value: string): number {
 /**
  * Resolve viewport dimensions (16:9).
  * When widthOverride is set, height is scaled proportionally.
- * When widthOverride is omitted and required is false, returns undefined (cloud default).
+ * When widthOverride is omitted and required is false, returns undefined so
+ * the converter can auto-detect from HTML meta / CSS / SVG.
  */
 export function resolveViewport(
   widthOverride?: string,

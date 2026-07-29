@@ -28,7 +28,7 @@ Stdin **requires** `-o` / `--output`.
 | `-o, --output <path>` | same basename as input | Required for stdin |
 | `--format <pptx\|png>` | `pptx` | PNG needs cloud |
 | `--mode <auto\|local\|cloud>` | `auto` | Agents: prefer `local` |
-| `--width <pixels>` | `1280` local | Height = width × 720/1280 |
+| `--width <pixels>` | auto → else `1280` | Height = width × 720/1280 when set. When omitted, auto-detect from `meta[name=deck-size]`, CSS `--deck-width`/`--deck-height`, or SVG viewBox |
 | `--platform <win\|mac\|ios\|android\|linux>` | current OS | Generic font mapping |
 | `--render-wait <seconds>` | `3` | Cloud per-page wait |
 | `--rebuild-svg` | off | Cloud only |

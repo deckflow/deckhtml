@@ -20,9 +20,16 @@ export interface ConversionOptions {
   splitByHeight?: boolean;
   /** Auto-detect multi-slide containers in one HTML file (default true). */
   autoDetectSlides?: boolean;
-  /** Browser viewport width in pixels (default 1280). Must match how the HTML is laid out. */
+  /**
+   * Browser viewport width in pixels.
+   * When omitted (with height), auto-detected from HTML (`meta[name=deck-size]`,
+   * `--deck-width`/`--deck-height`, stage JSON) or SVG viewBox; else 1280.
+   */
   viewportWidth?: number;
-  /** Browser viewport height in pixels (default 720). */
+  /**
+   * Browser viewport height in pixels.
+   * When omitted (with width), auto-detected from source; else 720.
+   */
   viewportHeight?: number;
   /** Allow loading local file:// subresources in Playwright (default: false). */
   allowLocalResources?: boolean;

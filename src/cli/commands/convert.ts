@@ -32,6 +32,11 @@ import {
 import { resolveMode, validateCloudOnlyFlags } from '../utils/mode';
 import { resolveViewport } from '../utils/size';
 import { atomicWriteFile } from '../utils/write';
+import {
+  DEFAULT_VIEWPORT_HEIGHT,
+  DEFAULT_VIEWPORT_WIDTH,
+  detectViewportFromFile,
+} from '../../utils/viewport';
 
 const DEFAULT_TIMEOUT = 600;
 
@@ -91,7 +96,7 @@ async function runLocalConvert(
   ctx: Context,
   inputPaths: string[],
   outputPath: string,
-  viewport: { width: number; height: number },
+  viewport: { width: number; height: number } | undefined,
   format: string,
   platform: PlatformTarget,
   executablePath?: string,
@@ -100,6 +105,19 @@ async function runLocalConvert(
   identityAttribute?: string,
   animations?: boolean
 ): Promise<ConversionResultEnvelope> {
+  const resolvedViewport =
+    viewport ??
+    detectViewportFromFile(inputPaths[0]!) ?? {
+      width: DEFAULT_VIEWPORT_WIDTH,
+      height: DEFAULT_VIEWPORT_HEIGHT,
+    };
+  const viewportOpts = viewport
+    ? {
+        viewportWidth: viewport.width,
+        viewportHeight: viewport.height,
+      }
+    : {};
+
   if (format === 'png') {
     logVerbose(
       ctx.verbose,
@@ -109,13 +127,14 @@ async function runLocalConvert(
     logVerbose(
       ctx.verbose,
       ctx.quiet,
-      `Viewport: ${viewport.width}x${viewport.height}`
+      `Viewport: ${resolvedViewport.width}x${resolvedViewport.height}${
+        viewport ? '' : ' (auto)'
+      }`
     );
 
     const result = await convertHtmlToPng({
       inputs: inputPaths,
-      viewportWidth: viewport.width,
-      viewportHeight: viewport.height,
+      ...viewportOpts,
       allowLocalResources: true,
       quiet: ctx.quiet,
       excludeSelector,
@@ -160,7 +179,9 @@ async function runLocalConvert(
   logVerbose(
     ctx.verbose,
     ctx.quiet,
-    `Viewport: ${viewport.width}x${viewport.height}`
+    `Viewport: ${resolvedViewport.width}x${resolvedViewport.height}${
+      viewport ? '' : ' (auto)'
+    }`
   );
   logVerbose(
     ctx.verbose,
@@ -170,8 +191,7 @@ async function runLocalConvert(
 
   const result = await convertHtmlToPptx({
     inputs: inputPaths,
-    viewportWidth: viewport.width,
-    viewportHeight: viewport.height,
+    ...viewportOpts,
     allowLocalResources: true,
     quiet: ctx.quiet,
     platform,
@@ -322,7 +342,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     .option('--mode <mode>', 'Execution mode: auto, local, or cloud', 'auto')
     .option(
       '--width <pixels>',
-      'Playwright viewport width (height scales at 16:9)'
+      'Playwright viewport width (height scales at 16:9). When omitted, auto-detect from HTML meta deck-size / CSS --deck-width, else 1280'
     )
     .option(
       '--platform <platform>',
@@ -389,8 +409,13 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
 
           const outputPath = deriveOutputPath(paths, format, options.output);
 
-          const localViewport = resolveViewport(options.width, true)!;
-          const cloudViewport = resolveViewport(options.width, false);
+          // Omit viewport when --width is unset so API auto-detects from HTML/SVG.
+          const explicitViewport = resolveViewport(options.width, false);
+          const localViewport = explicitViewport;
+          const cloudViewport =
+            explicitViewport ??
+            detectViewportFromFile(paths[0]!) ??
+            undefined;
 
           const startedAt = Date.now();
           let envelope: ConversionResultEnvelope;
@@ -422,6 +447,12 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
 
           if (options.report) {
             const reportPath = `${outputPath}.report.json`;
+            const reportViewport =
+              (mode === 'local' ? localViewport : cloudViewport) ??
+              detectViewportFromFile(paths[0]!) ?? {
+                width: DEFAULT_VIEWPORT_WIDTH,
+                height: DEFAULT_VIEWPORT_HEIGHT,
+              };
             // Prefer the new structured per-element report (DH-P0-002) when available
             // (local mode); fall back to the aggregate stats report for cloud mode.
             const report =
@@ -434,11 +465,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
                 slideCount: envelope.slideCount ?? 0,
                 stats: envelope.stats ?? EMPTY_CONVERSION_STATS,
                 platform,
-                ...(mode === 'local'
-                  ? { viewport: localViewport }
-                  : cloudViewport
-                    ? { viewport: cloudViewport }
-                    : {}),
+                viewport: reportViewport,
                 durationMs: Date.now() - startedAt,
               });
             await atomicWriteFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {

@@ -36,6 +36,7 @@ import { buildElementStats, buildFontStats, buildSimplifiedStats, recomputeSumma
 import { DiagnosticsCollector, ConversionError, RULE_IDS, type Diagnostic } from './utils/diagnostics';
 import { verifyOoxml } from './utils/ooxml-verify';
 import { applyAnimationsToElements } from './animation/apply';
+import { resolveConversionViewport } from './utils/viewport';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -48,54 +49,10 @@ const ENGINE_VERSION: string = (() => {
   }
 })();
 
-/**
- * Read SVG viewBox / width+height for viewport auto-sizing.
- */
-function parseSvgViewport(inputPath: string): { width: number; height: number } | null {
-  try {
-    const content = readFileSync(inputPath, 'utf8');
-    const viewBoxMatch = content.match(/\bviewBox=["']([^"']+)["']/i);
-    if (viewBoxMatch) {
-      const parts = viewBoxMatch[1].trim().split(/[\s,]+/).map(Number);
-      if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
-        return { width: Math.round(parts[2]), height: Math.round(parts[3]) };
-      }
-    }
-    const wMatch = content.match(/\bwidth=["']([\d.]+)/i);
-    const hMatch = content.match(/\bheight=["']([\d.]+)/i);
-    const w = wMatch ? parseFloat(wMatch[1]) : 0;
-    const h = hMatch ? parseFloat(hMatch[1]) : 0;
-    if (w > 0 && h > 0) return { width: Math.round(w), height: Math.round(h) };
-  } catch {
-    /* ignore read/parse errors */
-  }
-  return null;
-}
-
 function resolveInputPaths(options: ConversionOptions): string[] {
   if (options.inputs?.length) return options.inputs;
   if (options.input) return [options.input];
   throw new Error('At least one input file is required (use input or inputs).');
-}
-
-function resolveViewportForInput(
-  inputPath: string,
-  options: ConversionOptions
-): { width: number; height: number } {
-  const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
-  let viewportWidth = options.viewportWidth;
-  let viewportHeight = options.viewportHeight;
-  if (inputIsSvg && viewportWidth === undefined && viewportHeight === undefined) {
-    const svgViewport = parseSvgViewport(inputPath);
-    if (svgViewport) {
-      viewportWidth = svgViewport.width;
-      viewportHeight = svgViewport.height;
-    }
-  }
-  return {
-    width: viewportWidth ?? 1280,
-    height: viewportHeight ?? 720,
-  };
 }
 
 function collectFontsFromElements(
@@ -204,7 +161,7 @@ async function processSingleInput(
   identityDiagnostics?: import('./utils/diagnostics').Diagnostic[]
 ): Promise<ProcessSingleInputResult> {
   const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
-  const viewport = resolveViewportForInput(inputPath, options);
+  const viewport = resolveConversionViewport(inputPath, options);
   setViewportPixels(viewport.width, viewport.height);
 
   const page = await loader.loadHTML(

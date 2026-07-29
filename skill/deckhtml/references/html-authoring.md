@@ -6,14 +6,23 @@ DeckHTML loads HTML in Playwright, inspects the DOM, and maps elements to PPTX s
 
 ## Viewport contract
 
-- Default viewport: **1280×720** (16:9)
-- Override with CLI `--width` (height scales automatically)
-- Design each slide to that pixel size; do not rely on browser window scrolling as pagination
+- Default viewport: **1280×720** (16:9) when the HTML does not declare a size
+- **Auto-detect** (preferred): `<meta name="deck-size" content="… 1920x1080">`, CSS `--deck-width` / `--deck-height`, or embedded `"stage":{"width":…,"height":…}`
+- Explicit override: CLI `--width` (height scales at 16:9) always wins over auto-detect
+- Design each slide to the declared pixel size; do not rely on browser window scrolling as pagination
+
+```html
+<meta name="deck-size" content="landscape-16-9 1920x1080">
+```
 
 ```css
+:root {
+  --deck-width: 1920px;
+  --deck-height: 1080px;
+}
 .slide-container {
-  width: 1280px;
-  height: 720px;
+  width: var(--deck-width);
+  height: var(--deck-height);
   position: relative;
   overflow: hidden;
   box-sizing: border-box;

@@ -49,7 +49,7 @@ Task Progress:
 
 ### 1. Author HTML for conversion
 
-DeckHTML renders with Playwright at a fixed viewport (default **1280×720**, 16:9). Layout must match that viewport.
+DeckHTML renders with Playwright at a fixed viewport (default **1280×720**, 16:9). Prefer declaring size in HTML (`<meta name="deck-size" content="… 1920x1080">` or `--deck-width`/`--deck-height`) so the converter auto-detects; otherwise pass `--width` to match the design.
 
 **Multi-slide in one file** — use hosts the auto-detector recognizes (first matching rule wins, need ≥2 qualified hosts):
 

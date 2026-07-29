@@ -16,6 +16,7 @@ import {
 import { runQuietly } from './utils/quiet';
 import { EMPTY_CONVERSION_STATS, type ConversionStats } from './conversion-report';
 import type { ConversionOptions } from './types';
+import { resolveConversionViewport } from './utils/viewport';
 
 export interface PngConversionResult {
   /** One PNG buffer per detected page/slide, in order. */
@@ -28,15 +29,6 @@ function resolveInputPaths(options: ConversionOptions): string[] {
   if (options.inputs?.length) return options.inputs;
   if (options.input) return [options.input];
   throw new Error('At least one input file is required (use input or inputs).');
-}
-
-function resolveViewport(
-  options: ConversionOptions
-): { width: number; height: number } {
-  return {
-    width: options.viewportWidth ?? 1280,
-    height: options.viewportHeight ?? 720,
-  };
 }
 
 async function captureViewportPng(
@@ -89,7 +81,7 @@ async function exportSingleInputToPng(
   inputPath: string,
   options: ConversionOptions
 ): Promise<Buffer[]> {
-  const viewport = resolveViewport(options);
+  const viewport = resolveConversionViewport(inputPath, options);
   setViewportPixels(viewport.width, viewport.height);
 
   const page = await loader.loadHTML(inputPath, viewport, {
