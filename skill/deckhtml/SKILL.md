@@ -79,7 +79,7 @@ npx -y @deckflow/deckhtml@latest 01.html 02.html 03.html -o deck.pptx --mode loc
 - Charts/canvas: local embeds rasterized canvas; for editable charts use `--mode cloud --rebuild-chart`
 - Local images: relative paths work in local mode (`allowLocalResources`); keep assets next to the HTML
 - Avoid relying on hover-only state; ensure the visible slide state is in the DOM at capture time
-- Entrance animations: declare with `data-animation="fade-in"` (+ `data-animation-duration/delay/trigger`) for real PPTX animations; single-shot CSS `@keyframes` (opacity/translate/scale/rotate) and global anime.js calls are mapped automatically. Details: [references/animations.md](references/animations.md)
+- Entrance animations: declare with `data-animation="fade-in"` (+ `data-animation-duration/delay/trigger`) for real PPTX animations; single-shot CSS `@keyframes` (opacity/translate/scale/rotate), class-gated entrance `transition`s (e.g. `.is-entered`), and global anime.js calls are mapped automatically. Details: [references/animations.md](references/animations.md)
 
 **Start from the full template** (title / bullets / two-column / KPIs):
 

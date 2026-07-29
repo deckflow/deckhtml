@@ -1,6 +1,6 @@
 # Animations (local mode)
 
-DeckHTML exports element entrance animations into the PPTX as **native PowerPoint animations** (`p:timing`), playable in the slideshow. Animations are captured from three sources and normalized onto a cross-player stable subset.
+DeckHTML exports element entrance animations into the PPTX as **native PowerPoint animations** (`p:timing`), playable in the slideshow. Animations are captured from declared attributes, CSS `@keyframes`, class-gated entrance transitions, and anime.js, then normalized onto a cross-player stable subset.
 
 - Anything that maps → real PPTX animation (PowerPoint / WPS / Keynote / Google Slides re-import all play it)
 - Anything that does not map → element keeps its frozen end-state (same as before), plus a `DECKHTML_ANIMATION_UNMAPPED` warning in diagnostics / `--report`
@@ -38,7 +38,7 @@ Supported effect names:
 
 Unknown names and `*-out` (exit) effects are reported as unmapped.
 
-## 2. CSS animations
+## 2. CSS animations & entrance transitions
 
 Single-shot `@keyframes` entrance animations are inferred automatically — no markup changes needed:
 
@@ -47,6 +47,20 @@ Single-shot `@keyframes` entrance animations are inferred automatically — no m
 @keyframes flyIn {
   from { opacity: 0; transform: translateX(-240px); }
   to   { opacity: 1; transform: translateX(0); }
+}
+```
+
+Class-gated **entrance transitions** on `opacity` / `transform` are also captured. DeckHTML replays enter classes such as `is-entered`, `entered`, `revealed`, `in-view` (not deck-nav classes like `active` / `show`) and diffs start vs end motion:
+
+```css
+[data-enter] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 520ms, transform 520ms;
+}
+.slide-page.is-entered [data-enter] {
+  opacity: 1;
+  transform: translateY(0);
 }
 ```
 
@@ -64,9 +78,10 @@ What does **not** map (unmapped diagnostic, frozen end-state):
 
 - `animation-iteration-count: infinite` (looping/pulse — emphasis effects are not supported yet)
 - compound motion+scale, motion+rotate, or scale+rotate in one keyframe set
-- keyframes touching properties outside `opacity`/`transform` (color, size, filters, …)
+- keyframes / transitions touching properties outside `opacity`/`transform` (color, size, filters, …)
 - multi-step keyframes whose intermediate steps matter (only first/last frames are read)
-- CSS `transition` (not an animation declaration)
+- hover / focus transitions and other non-enter class gates
+- transitions that do not change when enter classes are toggled
 
 Easing curves are dropped; PPTX plays the default linear timing of each effect.
 

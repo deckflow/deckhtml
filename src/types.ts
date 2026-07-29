@@ -66,10 +66,11 @@ export interface ConversionOptions {
   strict?: StrictConversionOptions;
   /**
    * Entrance-animation export (default: enabled). Animations are captured from
-   * `data-animation*` declarations, CSS @keyframes and intercepted anime.js
-   * calls, then mapped onto the stable native PPTX subset (p:timing).
-   * Animations outside that subset keep the frozen end-state and emit
-   * DECKHTML_ANIMATION_UNMAPPED diagnostics. Pass `false` to disable.
+   * `data-animation*` declarations, CSS @keyframes, class-gated opacity/transform
+   * transitions (e.g. `.is-entered`), and intercepted anime.js calls, then mapped
+   * onto the stable native PPTX subset (p:timing). Animations outside that subset
+   * keep the frozen end-state and emit DECKHTML_ANIMATION_UNMAPPED diagnostics.
+   * Pass `false` to disable.
    */
   animations?: boolean | AnimationConversionOptions;
 }

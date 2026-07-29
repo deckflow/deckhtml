@@ -712,10 +712,13 @@ export class ElementInspector {
   }
 
   /**
-   * Capture CSS animation declarations (computed animation-* props + @keyframes
-   * first/last frames) before styles are frozen for inspection. Elements get a
-   * data-dh-anim-css marker; raw data lives on window.__deckhtmlCssAnimations
-   * and is folded into animationRaw.cssRaw by readAnimationRaw during inspect.
+   * Capture CSS animation declarations before styles are frozen for inspection:
+   * - `@keyframes` first/last frames (computed animation-* props)
+   * - class-gated entrance `transition`s (opacity/transform) via enter-class replay
+   *
+   * Elements get a data-dh-anim-css marker; raw data lives on
+   * window.__deckhtmlCssAnimations and is folded into animationRaw.cssRaw by
+   * readAnimationRaw during inspect.
    */
   private async captureCssAnimations(slideSelector?: string): Promise<void> {
     await this.page
@@ -723,6 +726,18 @@ export class ElementInspector {
         const WIN_KEY = '__deckhtmlCssAnimations';
         const MARK_ATTR = 'data-dh-anim-css';
         (window as any)[WIN_KEY] = {};
+
+        /** Enter / reveal classes that gate opacity/transform transitions (not deck nav). */
+        const ENTER_CLASS_CANDIDATES = [
+          'is-entered',
+          'entered',
+          'has-entered',
+          'animate-in',
+          'is-revealed',
+          'revealed',
+          'in-view',
+          'is-visible',
+        ];
 
         const parseCssTime = (v: string): number => {
           const m = v.trim().match(/^(-?\d+(?:\.\d+)?)(ms|s)?$/);
@@ -807,7 +822,17 @@ export class ElementInspector {
           return motion;
         };
 
-        const parseKeyframeFrame = (cssText: string) => {
+        type MotionFrame = {
+          opacity: number | null;
+          translateXPx: number;
+          translateYPx: number;
+          scaleX: number;
+          scaleY: number;
+          rotateDeg: number;
+          hasNonMotionProps: boolean;
+        };
+
+        const parseKeyframeFrame = (cssText: string): MotionFrame => {
           const open = cssText.indexOf('{');
           const close = cssText.lastIndexOf('}');
           const body = open >= 0 && close > open ? cssText.slice(open + 1, close) : '';
@@ -824,6 +849,70 @@ export class ElementInspector {
             }
           }
           return { opacity, ...parseTransformMotion(s.transform || ''), hasNonMotionProps };
+        };
+
+        const snapshotComputedMotion = (el: Element): MotionFrame => {
+          const cs = window.getComputedStyle(el);
+          const opacity = parseFloat(cs.opacity);
+          return {
+            opacity: Number.isFinite(opacity) ? opacity : null,
+            ...parseTransformMotion(cs.transform || ''),
+            hasNonMotionProps: false,
+          };
+        };
+
+        /** Max duration/delay among opacity|transform|all transition entries. */
+        const readMotionTransitionTiming = (
+          cs: CSSStyleDeclaration
+        ): { durationMs: number; delayMs: number } | null => {
+          const props = cs.transitionProperty.split(',').map((s) => s.trim());
+          if (props.length === 0 || (props.length === 1 && props[0] === 'none')) return null;
+          const durs = cs.transitionDuration.split(',').map((s) => s.trim());
+          const delays = cs.transitionDelay.split(',').map((s) => s.trim());
+          let maxDur = 0;
+          let matchedDelay = 0;
+          let hasMotion = false;
+          for (let i = 0; i < props.length; i++) {
+            const prop = props[i]!;
+            if (
+              prop !== 'all' &&
+              prop !== 'opacity' &&
+              prop !== 'transform' &&
+              !prop.startsWith('transform')
+            ) {
+              continue;
+            }
+            const dur = parseCssTime(durs[Math.min(i, durs.length - 1)] ?? durs[0] ?? '0s');
+            if (dur <= 0) continue;
+            hasMotion = true;
+            const delay = parseCssTime(delays[Math.min(i, delays.length - 1)] ?? delays[0] ?? '0s');
+            if (dur > maxDur) {
+              maxDur = dur;
+              matchedDelay = delay;
+            } else if (dur === maxDur && delay > matchedDelay) {
+              matchedDelay = delay;
+            }
+          }
+          return hasMotion ? { durationMs: maxDur, delayMs: matchedDelay } : null;
+        };
+
+        const looksLikeEntrance = (first: MotionFrame, last: MotionFrame): boolean => {
+          const fadesIn =
+            first.opacity !== null &&
+            first.opacity <= 0.01 &&
+            (last.opacity === null || last.opacity > first.opacity + 0.05);
+          const dx = last.translateXPx - first.translateXPx;
+          const dy = last.translateYPx - first.translateYPx;
+          const moves = Math.abs(dx) > 1 || Math.abs(dy) > 1;
+          const scales =
+            Math.abs(last.scaleX - first.scaleX) > 0.01 ||
+            Math.abs(last.scaleY - first.scaleY) > 0.01;
+          const rotates = Math.abs(last.rotateDeg - first.rotateDeg) > 0.5;
+          return fadesIn || moves || scales || rotates;
+        };
+
+        const forceReflow = (node: Element) => {
+          void (node as HTMLElement).offsetWidth;
         };
 
         // Index @keyframes rules (Chromium maps -webkit-keyframes to type 7 too).
@@ -852,13 +941,14 @@ export class ElementInspector {
             keyframes.set(kfRule.name, frames);
           }
         }
-        if (keyframes.size === 0) return;
 
         const root = rootSel ? document.querySelector(rootSel) : document.body;
         if (!root) return;
         const elements: Element[] = [root, ...Array.from(root.querySelectorAll('*'))];
         let seq = 0;
         const captured: Record<string, unknown> = {};
+
+        // --- 1) @keyframes captures ---
         for (const el of elements) {
           if (!(el instanceof HTMLElement || el instanceof SVGElement)) continue;
           const cs = window.getComputedStyle(el);
@@ -880,6 +970,155 @@ export class ElementInspector {
           el.setAttribute(MARK_ATTR, key);
           captured[key] = raw;
         }
+
+        // --- 2) Class-gated entrance transitions (opacity / transform) ---
+        // Replay by stripping (or adding) enter classes with transitions forced off,
+        // then diff computed motion into the same CssAnimationRaw shape as keyframes.
+        const freezeTransitions = (): HTMLStyleElement => {
+          const style = document.createElement('style');
+          style.setAttribute('data-deckhtml-transition-probe', '1');
+          style.textContent =
+            '*, *::before, *::after { transition: none !important; animation: none !important; }';
+          document.head.appendChild(style);
+          return style;
+        };
+
+        const collectEnterToggles = (): { el: Element; cls: string }[] => {
+          const toggles: { el: Element; cls: string }[] = [];
+          for (const el of elements) {
+            if (!(el instanceof Element)) continue;
+            for (const cls of ENTER_CLASS_CANDIDATES) {
+              if (el.classList.contains(cls)) toggles.push({ el, cls });
+            }
+          }
+          return toggles;
+        };
+
+        const recordTransitionCaptures = (
+          startByEl: Map<Element, MotionFrame>,
+          endByEl: Map<Element, { frame: MotionFrame; durationMs: number; delayMs: number }>
+        ): void => {
+          for (const [el, end] of endByEl) {
+            if (el.hasAttribute(MARK_ATTR)) continue;
+            const first = startByEl.get(el);
+            if (!first) continue;
+            if (!looksLikeEntrance(first, end.frame)) continue;
+            const key = String(seq++);
+            el.setAttribute(MARK_ATTR, key);
+            captured[key] = {
+              name: 'css-transition',
+              durationMs: end.durationMs,
+              delayMs: end.delayMs,
+              iterationCount: 1,
+              first,
+              last: end.frame,
+            };
+          }
+        };
+
+        const snapshotTransitionEnds = (): Map<
+          Element,
+          { frame: MotionFrame; durationMs: number; delayMs: number }
+        > => {
+          const endByEl = new Map<
+            Element,
+            { frame: MotionFrame; durationMs: number; delayMs: number }
+          >();
+          for (const el of elements) {
+            if (!(el instanceof HTMLElement || el instanceof SVGElement)) continue;
+            if (el.hasAttribute(MARK_ATTR)) continue;
+            const cs = window.getComputedStyle(el);
+            const timing = readMotionTransitionTiming(cs);
+            if (!timing) continue;
+            endByEl.set(el, {
+              frame: snapshotComputedMotion(el),
+              durationMs: timing.durationMs,
+              delayMs: timing.delayMs,
+            });
+          }
+          return endByEl;
+        };
+
+        const snapshotTransitionStarts = (candidates: Iterable<Element>): Map<Element, MotionFrame> => {
+          const startByEl = new Map<Element, MotionFrame>();
+          for (const el of candidates) {
+            startByEl.set(el, snapshotComputedMotion(el));
+          }
+          return startByEl;
+        };
+
+        // Phase A: enter class already applied (typical after page-runtime enter()).
+        const presentToggles = collectEnterToggles();
+        if (presentToggles.length > 0) {
+          const endByEl = snapshotTransitionEnds();
+          const probeStyle = freezeTransitions();
+          for (const { el, cls } of presentToggles) el.classList.remove(cls);
+          forceReflow(root);
+          const startByEl = snapshotTransitionStarts(endByEl.keys());
+          for (const { el, cls } of presentToggles) el.classList.add(cls);
+          forceReflow(root);
+          probeStyle.remove();
+          recordTransitionCaptures(startByEl, endByEl);
+        }
+
+        // Phase B: no enter class yet — try adding candidates on the slide root so
+        // inactive / pre-enter slides still yield entrance diffs. Keep a class that
+        // produces captures so inspect sees the visible end-state.
+        // Timing must be read with the enter class applied and without the freeze
+        // stylesheet (delays often live under `.is-entered …` rules).
+        if (presentToggles.length === 0) {
+          const hosts: Element[] = [root];
+          const pageHost = root.querySelector('.slide-page, .slide, [data-slide]');
+          if (pageHost && pageHost !== root) hosts.push(pageHost);
+
+          let kept = false;
+          for (const host of hosts) {
+            for (const cls of ENTER_CLASS_CANDIDATES) {
+              if (host.classList.contains(cls)) continue;
+              const candidateEls = elements.filter(
+                (el) =>
+                  (el instanceof HTMLElement || el instanceof SVGElement) &&
+                  !el.hasAttribute(MARK_ATTR) &&
+                  Boolean(readMotionTransitionTiming(window.getComputedStyle(el)))
+              );
+              if (candidateEls.length === 0) continue;
+              const startByEl = snapshotTransitionStarts(candidateEls);
+              const probeStyle = freezeTransitions();
+              host.classList.add(cls);
+              forceReflow(root);
+              const endFrames = new Map<Element, MotionFrame>();
+              for (const el of startByEl.keys()) {
+                endFrames.set(el, snapshotComputedMotion(el));
+              }
+              probeStyle.remove();
+              forceReflow(root);
+              // Read duration/delay in the entered state (freeze stylesheet removed).
+              const endByEl = new Map<
+                Element,
+                { frame: MotionFrame; durationMs: number; delayMs: number }
+              >();
+              for (const [el, frame] of endFrames) {
+                const timing = readMotionTransitionTiming(window.getComputedStyle(el));
+                if (!timing) continue;
+                endByEl.set(el, {
+                  frame,
+                  durationMs: timing.durationMs,
+                  delayMs: timing.delayMs,
+                });
+              }
+              const beforeCount = Object.keys(captured).length;
+              recordTransitionCaptures(startByEl, endByEl);
+              if (Object.keys(captured).length > beforeCount) {
+                kept = true;
+                break;
+              }
+              host.classList.remove(cls);
+              forceReflow(root);
+            }
+            if (kept) break;
+          }
+        }
+
         (window as any)[WIN_KEY] = captured;
       }, slideSelector ?? null)
       .catch(() => {});

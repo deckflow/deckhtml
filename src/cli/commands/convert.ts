@@ -369,7 +369,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     )
     .option(
       '--no-animations',
-      'Disable entrance-animation export (data-animation*, CSS @keyframes, anime.js interception)'
+      'Disable entrance-animation export (data-animation*, CSS @keyframes/transitions, anime.js interception)'
     )
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {

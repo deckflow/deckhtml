@@ -6,9 +6,9 @@ import {
 } from '../types';
 
 /**
- * Normalizes animation declarations from all three capture sources (explicit
- * data attributes, CSS @keyframes, intercepted anime.js calls) onto the
- * cross-player stable PPTX entrance subset:
+ * Normalizes animation declarations from capture sources (explicit data
+ * attributes, CSS @keyframes, class-gated CSS transitions, intercepted anime.js
+ * calls) onto the cross-player stable PPTX entrance subset:
  * appear / fade / fly / zoom / spin / wipe.
  *
  * Anything outside that subset (exit/emphasis semantics, compound rotation,

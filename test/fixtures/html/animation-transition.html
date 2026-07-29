@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CSS transition entrance fixture</title>
+<style>
+  body { margin: 0; width: 1280px; height: 720px; background: #f5f7fa; font-family: Arial, sans-serif; }
+  .slide-page { position: relative; width: 1280px; height: 720px; }
+
+  [data-enter] {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 520ms cubic-bezier(.2,.8,.2,1), transform 520ms cubic-bezier(.2,.8,.2,1);
+  }
+  .slide-page.is-entered [data-enter] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .slide-page.is-entered [data-enter="2"] { transition-delay: 90ms; }
+  .slide-page.is-entered [data-enter="3"] { transition-delay: 180ms; }
+
+  h1 {
+    position: absolute; left: 90px; top: 80px; margin: 0; font-size: 52px; color: #10243a;
+  }
+  .lead {
+    position: absolute; left: 90px; top: 200px; margin: 0; width: 640px;
+    font-size: 24px; color: #40566e; line-height: 1.4;
+  }
+  .card {
+    position: absolute; left: 90px; top: 360px; width: 420px; height: 140px;
+    background: #2f7cf6; border-radius: 16px; color: #fff; font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* Hover-only transition must not become a PPTX entrance animation. */
+  .hover-chip {
+    position: absolute; left: 560px; top: 400px; padding: 12px 20px;
+    background: #fff; border: 1px solid #c5d0dc; border-radius: 8px;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+  .hover-chip:hover { background: #10243a; color: #fff; }
+</style>
+</head>
+<body>
+<article class="slide-page" data-slide-id="transition-01">
+  <h1 data-enter="1" data-element-id="tr-title">Transition Entrances</h1>
+  <p class="lead" data-enter="2" data-element-id="tr-lead">Class-gated opacity + translateY, staggered delays.</p>
+  <div class="card" data-enter="3" data-element-id="tr-card">Fade + fly from bottom</div>
+  <div class="hover-chip" data-element-id="tr-hover">Hover only</div>
+</article>
+<script>
+  requestAnimationFrame(() => {
+    document.querySelector('.slide-page')?.classList.add('is-entered');
+  });
+</script>
+</body>
+</html>
