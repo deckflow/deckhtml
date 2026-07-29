@@ -203,8 +203,10 @@ export interface ElementInfo {
    * or self — carrying a `data-animation` / CSS / anime.js declaration). The
    * generator wraps all member shapes sharing the same id into one PPTX
    * <p:grpSp> so the entrance animation targets the group as a whole, matching
-   * the HTML subtree-animation behaviour. Undefined when the element is not
-   * inside any animated subtree.
+   * the HTML subtree-animation behaviour. Descendants of a layout-only group
+   * root (not itself emitted) inherit the root's animation capture so the
+   * group still gets p:timing. Undefined when the element is not inside any
+   * animated subtree.
    */
   animationGroupId?: string;
   /**

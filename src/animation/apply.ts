@@ -22,6 +22,10 @@ export interface ApplyAnimationsContext {
  * Runs on the Node side after inspection; clears animationRaw afterwards.
  * Returns DECKHTML_ANIMATION_UNMAPPED diagnostics for effects outside the
  * native PPTX subset (those elements keep their frozen end-state).
+ *
+ * When several animation groups inherit the same intercepted anime.js call
+ * (one `animate([elA, elB], …)` targeting multiple roots), later groups get
+ * `withPrevious` so they play together — matching the HTML co-target timing.
  */
 export function applyAnimationsToElements(
   elements: ElementInfo[],
@@ -37,7 +41,11 @@ export function applyAnimationsToElements(
       : undefined;
 
   const diagnostics: Diagnostic[] = [];
-  for (const el of elements) {
+  /** anime call index → first owner key (group id or element id) that claimed it. */
+  const animeCallOwner = new Map<number, string>();
+
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
     const raw = el.animationRaw;
     if (!raw) continue;
 
@@ -47,7 +55,7 @@ export function applyAnimationsToElements(
       raw.animeRaws && raw.animeRaws.length > 0
         ? raw.animeRaws
         : (raw.animeCallIndices ?? [])
-            .map((i) => ctx.animeCalls?.[i])
+            .map((idx) => ctx.animeCalls?.[idx])
             .filter((c): c is AnimeCallRaw => Boolean(c));
 
     const built = buildElementAnimations({
@@ -63,6 +71,25 @@ export function applyAnimationsToElements(
       animeCalls: animeCalls.length ? animeCalls : undefined,
       options,
     });
+
+    const ownerKey = el.animationGroupId ?? el.elementId ?? `anon-${i}`;
+    const indices = raw.animeCallIndices ?? [];
+    let shareWithPrevious = false;
+    for (const idx of indices) {
+      const owner = animeCallOwner.get(idx);
+      if (owner === undefined) {
+        animeCallOwner.set(idx, ownerKey);
+      } else if (owner !== ownerKey) {
+        shareWithPrevious = true;
+      }
+    }
+    if (shareWithPrevious) {
+      for (const anim of built.animations) {
+        if (anim.source === 'animejs' && anim.trigger === 'afterPrevious') {
+          anim.trigger = 'withPrevious';
+        }
+      }
+    }
 
     if (built.animations.length > 0) {
       el.animations = built.animations;

@@ -1418,12 +1418,10 @@ export class ElementInspector {
         }
 
         /**
-         * Read raw animation capture for an element: explicit data-animation*
-         * declaration, CSS capture key (data-dh-anim-css, stamped before styles
-         * are frozen) and intercepted anime.js call indices (data-dh-anim-anime).
-         * Normalized into ElementInfo.animations on the Node side.
+         * Read raw animation capture from attributes on this element only
+         * (no ancestor inheritance).
          */
-        function readAnimationRaw(element: Element): any | undefined {
+        function readOwnAnimationRaw(element: Element): any | undefined {
           if (!(element instanceof Element)) return undefined;
           const raw: any = {};
           const effect = element.getAttribute('data-animation');
@@ -1461,6 +1459,27 @@ export class ElementInspector {
             }
           }
           return Object.keys(raw).length > 0 ? raw : undefined;
+        }
+
+        /**
+         * Read raw animation capture for an element: explicit data-animation*
+         * declaration, CSS capture key (data-dh-anim-css, stamped before styles
+         * are frozen) and intercepted anime.js call indices (data-dh-anim-anime).
+         * Normalized into ElementInfo.animations on the Node side.
+         *
+         * Layout-only group roots (type=container) are stamped with
+         * data-dh-anim-gid but never emitted as ElementInfo. Descendants
+         * therefore inherit the root's capture so the generator can still wrap
+         * them into one <p:grpSp> and attach p:timing.
+         */
+        function readAnimationRaw(element: Element): any | undefined {
+          if (!(element instanceof Element)) return undefined;
+          const own = readOwnAnimationRaw(element);
+          if (own) return own;
+          const owner = (element as HTMLElement).closest?.('[data-dh-anim-gid]');
+          if (!owner || owner === element) return undefined;
+          if (!elementCarriesAnimation(owner)) return undefined;
+          return readOwnAnimationRaw(owner);
         }
 
         /**
