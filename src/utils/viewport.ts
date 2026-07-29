@@ -6,12 +6,20 @@
  * loads at the design width (critical for fixed-px decks such as 1920×1080).
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, isAbsolute, resolve } from 'path';
 
 export const DEFAULT_VIEWPORT_WIDTH = 1280;
 export const DEFAULT_VIEWPORT_HEIGHT = 720;
 
 export type ViewportSize = { width: number; height: number };
+
+/** CSS custom property prefixes used for slide canvas size. */
+const SIZE_CSS_VAR_PREFIXES = ['deck', 'page', 'slide', 'canvas'] as const;
+
+/** Selectors that commonly declare a fixed slide/canvas box in px. */
+const SLIDE_HOST_SELECTOR_RE =
+  /(?:^|[,{\s])(?:html|body|\.slide-page|\.slide-container|\.slide-wrap|\.slide-canvas|\.slide|#slide)(?=[\s,{.#:[>+~]|$)/i;
 
 function isPositiveSize(width: number, height: number): boolean {
   return (
@@ -20,6 +28,13 @@ function isPositiveSize(width: number, height: number): boolean {
     width > 0 &&
     height > 0
   );
+}
+
+function size16x9FromWidth(width: number): ViewportSize {
+  return {
+    width,
+    height: Math.round((width * DEFAULT_VIEWPORT_HEIGHT) / DEFAULT_VIEWPORT_WIDTH),
+  };
 }
 
 /** Parse the first `WxH` / `W×H` token in a string (e.g. meta deck-size). */
@@ -66,16 +81,98 @@ export function parseDeckSizeMeta(html: string): ViewportSize | null {
 }
 
 /**
- * Read CSS custom properties `--deck-width` / `--deck-height` (px).
+ * Read `<meta name="viewport" content="width=1920, …">`.
+ * Ignores `width=device-width`. Height defaults to 16:9 when omitted.
  */
-export function parseDeckCssVariables(html: string): ViewportSize | null {
-  const widthMatch = html.match(/--deck-width\s*:\s*([^;}\n]+)/i);
-  const heightMatch = html.match(/--deck-height\s*:\s*([^;}\n]+)/i);
-  if (!widthMatch || !heightMatch) return null;
-  const width = parseCssPxLength(widthMatch[1]!);
-  const height = parseCssPxLength(heightMatch[1]!);
-  if (width == null || height == null) return null;
-  return { width, height };
+export function parseViewportMeta(html: string): ViewportSize | null {
+  const metaRe =
+    /<meta\b[^>]*\bname\s*=\s*["']viewport["'][^>]*>/gi;
+  let metaMatch: RegExpExecArray | null;
+  while ((metaMatch = metaRe.exec(html)) !== null) {
+    const tag = metaMatch[0];
+    const contentMatch = tag.match(/\bcontent\s*=\s*["']([^"']+)["']/i);
+    if (!contentMatch) continue;
+    const size = parseViewportMetaContent(contentMatch[1]!);
+    if (size) return size;
+  }
+
+  const altRe =
+    /<meta\b[^>]*\bcontent\s*=\s*["']([^"']+)["'][^>]*\bname\s*=\s*["']viewport["'][^>]*>/gi;
+  let altMatch: RegExpExecArray | null;
+  while ((altMatch = altRe.exec(html)) !== null) {
+    const size = parseViewportMetaContent(altMatch[1]!);
+    if (size) return size;
+  }
+
+  return null;
+}
+
+function parseViewportMetaContent(content: string): ViewportSize | null {
+  const widthMatch = content.match(/(?:^|[,;\s])width\s*=\s*([^,;\s]+)/i);
+  if (!widthMatch) return null;
+  const widthToken = widthMatch[1]!.trim();
+  if (/^device-width$/i.test(widthToken)) return null;
+  const width = Math.round(parseFloat(widthToken));
+  if (!Number.isFinite(width) || width <= 0) return null;
+
+  const heightMatch = content.match(/(?:^|[,;\s])height\s*=\s*([^,;\s]+)/i);
+  if (heightMatch) {
+    const heightToken = heightMatch[1]!.trim();
+    if (!/^device-height$/i.test(heightToken)) {
+      const height = Math.round(parseFloat(heightToken));
+      if (Number.isFinite(height) && height > 0) {
+        return { width, height };
+      }
+    }
+  }
+
+  return size16x9FromWidth(width);
+}
+
+/**
+ * Read CSS custom properties for slide size.
+ * Recognizes `--deck|page|slide|canvas-width` paired with matching `-height` (px).
+ */
+export function parseDeckCssVariables(cssOrHtml: string): ViewportSize | null {
+  for (const prefix of SIZE_CSS_VAR_PREFIXES) {
+    const widthMatch = cssOrHtml.match(
+      new RegExp(`--${prefix}-width\\s*:\\s*([^;}\\n]+)`, 'i')
+    );
+    const heightMatch = cssOrHtml.match(
+      new RegExp(`--${prefix}-height\\s*:\\s*([^;}\\n]+)`, 'i')
+    );
+    if (!widthMatch || !heightMatch) continue;
+    const width = parseCssPxLength(widthMatch[1]!);
+    const height = parseCssPxLength(heightMatch[1]!);
+    if (width == null || height == null) continue;
+    return { width, height };
+  }
+  return null;
+}
+
+/**
+ * Read fixed `width`/`height` px on common slide host / root selectors.
+ */
+export function parseFixedSlideHostSize(cssOrHtml: string): ViewportSize | null {
+  // Match CSS rule blocks; keep it simple (no nested @rules required for our cases).
+  const ruleRe = /([^{}@]+)\{([^{}]+)\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = ruleRe.exec(cssOrHtml)) !== null) {
+    const selectors = match[1]!;
+    const body = match[2]!;
+    if (!SLIDE_HOST_SELECTOR_RE.test(selectors)) continue;
+
+    const widthMatch = body.match(/(?:^|[;\s])width\s*:\s*([^;}\n]+)/i);
+    const heightMatch = body.match(/(?:^|[;\s])height\s*:\s*([^;}\n]+)/i);
+    if (!widthMatch || !heightMatch) continue;
+    const width = parseCssPxLength(widthMatch[1]!);
+    const height = parseCssPxLength(heightMatch[1]!);
+    if (width == null || height == null) continue;
+    // Ignore tiny decorative boxes accidentally matching a host selector.
+    if (width < 320 || height < 180) continue;
+    return { width, height };
+  }
+  return null;
 }
 
 /**
@@ -95,11 +192,67 @@ export function parseStageJson(html: string): ViewportSize | null {
   return isPositiveSize(width, height) ? { width, height } : null;
 }
 
-/** Detect declared slide size from HTML source (meta → CSS vars → stage JSON). */
-export function detectViewportFromHtml(html: string): ViewportSize | null {
+/** Collect relative/local stylesheet hrefs from HTML link tags. */
+export function collectLocalStylesheetHrefs(html: string): string[] {
+  const hrefs: string[] = [];
+  const linkRe = /<link\b[^>]*>/gi;
+  let linkMatch: RegExpExecArray | null;
+  while ((linkMatch = linkRe.exec(html)) !== null) {
+    const tag = linkMatch[0];
+    if (!/\brel\s*=\s*["'][^"']*stylesheet[^"']*["']/i.test(tag)) continue;
+    const hrefMatch = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+    const href = hrefMatch[1]!.trim();
+    if (!href || /^(https?:|data:|\/\/)/i.test(href)) continue;
+    hrefs.push(href);
+  }
+  return hrefs;
+}
+
+function readLocalStylesheets(html: string, baseDir: string): string {
+  const chunks: string[] = [];
+  for (const href of collectLocalStylesheetHrefs(html)) {
+    const filePath = isAbsolute(href) ? href : resolve(baseDir, href);
+    if (!existsSync(filePath)) continue;
+    try {
+      chunks.push(readFileSync(filePath, 'utf8'));
+    } catch {
+      // ignore unreadable stylesheets
+    }
+  }
+  return chunks.join('\n');
+}
+
+function detectFromCssSources(...sources: string[]): ViewportSize | null {
+  for (const source of sources) {
+    if (!source) continue;
+    const fromVars = parseDeckCssVariables(source);
+    if (fromVars) return fromVars;
+  }
+  for (const source of sources) {
+    if (!source) continue;
+    const fromHost = parseFixedSlideHostSize(source);
+    if (fromHost) return fromHost;
+  }
+  return null;
+}
+
+/**
+ * Detect declared slide size from HTML source.
+ * Order: deck-size meta → CSS size vars → viewport meta → stage JSON → fixed host px.
+ * When `baseDir` is set, also reads local linked stylesheets for CSS signals.
+ */
+export function detectViewportFromHtml(
+  html: string,
+  options: { baseDir?: string } = {}
+): ViewportSize | null {
+  const linkedCss =
+    options.baseDir != null ? readLocalStylesheets(html, options.baseDir) : '';
+
   return (
     parseDeckSizeMeta(html) ??
-    parseDeckCssVariables(html) ??
+    detectFromCssSources(html, linkedCss) ??
+    parseViewportMeta(html) ??
     parseStageJson(html)
   );
 }
@@ -129,8 +282,8 @@ export function detectViewportFromSvg(svg: string): ViewportSize | null {
 }
 
 /**
- * Detect viewport from a file on disk. HTML uses deck-size / CSS vars / stage;
- * SVG uses viewBox or width/height attributes.
+ * Detect viewport from a file on disk. HTML uses deck-size / CSS vars / viewport
+ * meta / stage / linked stylesheets; SVG uses viewBox or width/height attributes.
  */
 export function detectViewportFromFile(inputPath: string): ViewportSize | null {
   try {
@@ -138,7 +291,7 @@ export function detectViewportFromFile(inputPath: string): ViewportSize | null {
     if (inputPath.toLowerCase().endsWith('.svg')) {
       return detectViewportFromSvg(content);
     }
-    return detectViewportFromHtml(content);
+    return detectViewportFromHtml(content, { baseDir: dirname(inputPath) });
   } catch {
     return null;
   }

@@ -342,7 +342,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
     .option('--mode <mode>', 'Execution mode: auto, local, or cloud', 'auto')
     .option(
       '--width <pixels>',
-      'Playwright viewport width (height scales at 16:9). When omitted, auto-detect from HTML meta deck-size / CSS --deck-width, else 1280'
+      'Playwright viewport width (height scales at 16:9). When omitted, auto-detect from HTML deck-size / viewport meta / CSS size vars / slide hosts, else 1280'
     )
     .option(
       '--platform <platform>',

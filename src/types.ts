@@ -23,7 +23,8 @@ export interface ConversionOptions {
   /**
    * Browser viewport width in pixels.
    * When omitted (with height), auto-detected from HTML (`meta[name=deck-size]`,
-   * `--deck-width`/`--deck-height`, stage JSON) or SVG viewBox; else 1280.
+   * `--deck|page|slide|canvas-width/height`, `meta[name=viewport]` numeric width,
+   * stage JSON, fixed slide-host px, local linked CSS) or SVG viewBox; else 1280.
    */
   viewportWidth?: number;
   /**
