@@ -37,6 +37,7 @@ import { DiagnosticsCollector, ConversionError, RULE_IDS, type Diagnostic } from
 import { verifyOoxml } from './utils/ooxml-verify';
 import { applyAnimationsToElements } from './animation/apply';
 import { resolveConversionViewport } from './utils/viewport';
+import { resolveSlideTransitionPlan } from './slide-transition/resolve';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -734,11 +735,14 @@ export async function convertHtmlToPptx(
   const usedFontsDeduped = [...new Set(Array.from(usedFontsMap.values()).map((d) => d.fontFamily))].sort();
   const fontStats = buildFontStats(usedFontsMap);
 
+  const slideTransitionPlan = resolveSlideTransitionPlan(options.slideTransitions);
+
   const generator = new PPTXGenerator({
     platformFontContext,
     splitByHeight: options.splitByHeight,
     slideSelector: options.slideSelector,
     slideCoordsNormalized,
+    slideTransitionPlan,
   });
   generator.report.ignoredCount = totalExcludedCount;
   for (const d of identityDiagnostics) generator.report.diagnostics.push(d);

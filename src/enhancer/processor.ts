@@ -16,6 +16,7 @@ import { applyWritingModeToXml } from './writing-mode-xml';
 import { applyEquationToXml } from './equation-xml';
 import { applyAnimationTimingToXml } from './timing-xml';
 import { applyAnimationGroupToXml } from './animation-group-xml';
+import { applySlideTransitionToXml } from './transition-xml';
 import { stripUndeclaredWordMlFromSlide } from '../utils/omml-style';
 
 /**
@@ -50,7 +51,12 @@ export async function applyStyleEnhancements(
     const enhancements = registry.getForSlide(slideIndex)
       .sort((a, b) => a.elementIndex - b.elementIndex)
       .sort((a, b) => {
-        const pri = (t: string) => (t === 'animationGroup' ? 0 : t === 'animation' ? 1 : 2);
+        // animationGroup → slideTransition → animation → others
+        // transition must land before timing in the OOXML schema order.
+        const pri = (t: string) =>
+          t === 'animationGroup' ? 0 :
+          t === 'slideTransition' ? 1 :
+          t === 'animation' ? 2 : 3;
         return pri(a.type) - pri(b.type);
       });
 
@@ -111,6 +117,8 @@ function applyEnhancement(slideXml: string, enhancement: StyleEnhancement): stri
       return applyAnimationTimingToXml(slideXml, enhancement);
     case 'animationGroup':
       return applyAnimationGroupToXml(slideXml, enhancement);
+    case 'slideTransition':
+      return applySlideTransitionToXml(slideXml, enhancement);
     case 'shadow':
       // Future implementation
       return slideXml;

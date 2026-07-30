@@ -80,6 +80,8 @@ npx -y @deckflow/deckhtml@latest 01.html 02.html 03.html -o deck.pptx --mode loc
 - Local images: relative paths work in local mode (`allowLocalResources`); keep assets next to the HTML
 - Avoid relying on hover-only state; ensure the visible slide state is in the DOM at capture time
 - Entrance animations: declare with `data-animation="fade-in"` (+ `data-animation-duration/delay/trigger`) for real PPTX animations; single-shot CSS `@keyframes` (opacity/translate/scale/rotate), class-gated entrance `transition`s (e.g. `.is-entered`), and global anime.js calls are mapped automatically. Details: [references/animations.md](references/animations.md)
+- Slide-to-slide transitions (fade / push / wipe / …): enabled by default with a **per-slide** random effect; override with `--slide-transition <name>` or disable with `--no-slide-transitions`. Distinct from element entrance animations. Details: [references/slide-transitions.md](references/slide-transitions.md)
+- Slide-to-slide transitions (fade / push / wipe / …): enabled by default with a **per-slide** random effect; override with `--slide-transition <name>` or disable with `--no-slide-transitions`. Distinct from element entrance animations. Details: [references/slide-transitions.md](references/slide-transitions.md)
 
 **Start from the full template** (title / bullets / two-column / KPIs):
 
@@ -181,5 +183,6 @@ Requires peer deps: `playwright-core`, `pptxgenjs`. Local API is PPTX-only.
 - [references/cli.md](references/cli.md) — flags, modes, auth
 - [references/html-authoring.md](references/html-authoring.md) — slide HTML conventions
 - [references/animations.md](references/animations.md) — entrance-animation declarations, CSS/anime.js mapping, triggers
+- [references/slide-transitions.md](references/slide-transitions.md) — slide-to-slide transition catalog, CLI/API
 - [references/output-contract.md](references/output-contract.md) — JSON / report / exit codes
 - [references/troubleshooting.md](references/troubleshooting.md) — common failures

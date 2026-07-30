@@ -17,7 +17,7 @@ import { getPlaceholderForMediaType } from './utils/placeholder-assets';
 import { ensurePptxgenAllowsHttp } from './utils/pptxgen-http-patch';
 import { ReportCollector, type ElementReportRecord, type MappingMode } from './conversion-report';
 import { pxToInchX, pxToInchY } from './utils/coordinate';
-
+import type { ResolvedSlideTransition, SlideTransitionPlan } from './slide-transition/resolve';
 // pptxgenjs must accept plain http:// for all remote media types.
 ensurePptxgenAllowsHttp();
 
@@ -30,6 +30,10 @@ export interface PPTXGeneratorOptions {
   slideSelector?: string;
   /** Coordinates already normalized per slide (multi-slide isolation path). */
   slideCoordsNormalized?: boolean;
+  /**
+   * Slide-to-slide transition plan (disabled / fixed / per-slide random).
+   */
+  slideTransitionPlan?: SlideTransitionPlan;
 }
 
 export class PPTXGenerator {
@@ -41,6 +45,8 @@ export class PPTXGenerator {
   private registry: StyleEnhancementRegistry;
   /** Per-slide animation timing specs, registered as enhancements in generate(). */
   private animationSpecs = new Map<number, SlideAnimationSpec>();
+  /** Slide-to-slide transition plan (disabled when mode === 'disabled'). */
+  private slideTransitionPlan: SlideTransitionPlan;
   /** Per-element report collector (DH-P0-002). */
   readonly report = new ReportCollector();
 
@@ -64,6 +70,7 @@ export class PPTXGenerator {
     this.splitByHeight = options.splitByHeight ?? false;
     this.slideSelector = options.slideSelector;
     this.slideCoordsNormalized = options.slideCoordsNormalized ?? false;
+    this.slideTransitionPlan = options.slideTransitionPlan ?? { mode: 'disabled' };
   }
 
   /**
@@ -96,6 +103,39 @@ export class PPTXGenerator {
         type: 'animation',
         animationData: spec,
       });
+    }
+
+    // Register slide-to-slide transitions (p:transition) for every created slide.
+    // Schema order requires transition before timing; processor priority enforces this.
+    const transitionEffects: string[] = [];
+    if (this.slideTransitionPlan.mode !== 'disabled') {
+      for (const slideIndex of slideIndices) {
+        const elements = slidesMap.get(slideIndex);
+        if (!elements || elements.length === 0) continue;
+        const transition: ResolvedSlideTransition =
+          this.slideTransitionPlan.mode === 'fixed'
+            ? this.slideTransitionPlan.transition
+            : this.slideTransitionPlan.next();
+        transitionEffects.push(transition.effect);
+        this.registry.register({
+          slideIndex,
+          elementIndex: 0,
+          type: 'slideTransition',
+          slideTransitionXml: transition.xml,
+        });
+      }
+      if (transitionEffects.length > 0) {
+        const unique = [...new Set(transitionEffects)];
+        let summary: string;
+        if (this.slideTransitionPlan.mode === 'fixed') {
+          summary = `${transitionEffects[0]} × ${transitionEffects.length}`;
+        } else if (this.slideTransitionPlan.mode === 'cycle') {
+          summary = `cycle [${this.slideTransitionPlan.effects.join(', ')}]`;
+        } else {
+          summary = `random per slide (${unique.join(', ')})`;
+        }
+        console.log(`\n🎬 Slide transitions: ${summary}`);
+      }
     }
 
     // Phase 2: Apply style enhancements if needed

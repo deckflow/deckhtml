@@ -2,6 +2,8 @@
 
 DeckHTML exports element entrance animations into the PPTX as **native PowerPoint animations** (`p:timing`), playable in the slideshow. Animations are captured from declared attributes, CSS `@keyframes`, class-gated entrance transitions, and anime.js, then normalized onto a cross-player stable subset.
 
+This document covers **element** animations only. For **slide-to-slide** transitions (`p:transition`), see [slide-transitions.md](slide-transitions.md).
+
 - Anything that maps → real PPTX animation (PowerPoint / WPS / Keynote / Google Slides re-import all play it)
 - Anything that does not map → element keeps its frozen end-state (same as before), plus a `DECKHTML_ANIMATION_UNMAPPED` warning in diagnostics / `--report`
 - `--no-animations` disables the whole pipeline (previous behavior: everything frozen)

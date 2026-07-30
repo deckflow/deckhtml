@@ -73,6 +73,37 @@ export interface ConversionOptions {
    * Pass `false` to disable.
    */
   animations?: boolean | AnimationConversionOptions;
+  /**
+   * Slide-to-slide transition effects (OOXML `p:transition`) — distinct from
+   * element entrance animations above.
+   *
+   * - `undefined` / `true` / `'random'`: each slide gets its own randomly
+   *   chosen catalog effect (default)
+   * - effect name string (e.g. `'fade'`): that effect on every slide
+   * - comma-separated names (e.g. `'fade,push,wipe'`): cycle through the list
+   * - `false` / `'none'`: disable slide transitions
+   * - object: `{ effect?, effects?, speed?, seed?, enabled? }`
+   */
+  slideTransitions?: boolean | string | SlideTransitionOptions;
+}
+
+export interface SlideTransitionOptions {
+  /**
+   * Catalog effect name, comma-separated cycle list, or `'random'` / `'none'`.
+   * Ignored when `effects` is set. Default: `'random'`.
+   */
+  effect?: string;
+  /**
+   * Explicit ordered list of catalog effect names to cycle through.
+   * Takes precedence over `effect` when non-empty.
+   */
+  effects?: string[];
+  /** Transition speed. Default: `'med'`. */
+  speed?: 'slow' | 'med' | 'fast';
+  /** When false, disables slide transitions. Default: true. */
+  enabled?: boolean;
+  /** Seed for deterministic random effect / direction selection. */
+  seed?: number;
 }
 
 export interface AnimationConversionOptions {
@@ -514,6 +545,7 @@ export type StyleEnhancementType =
   | 'equation'      // MathML → OMML in text box (a14:m)
   | 'animationGroup' // Wrap sibling shapes from one animated DOM subtree into a <p:grpSp>
   | 'animation'     // Entrance animations → p:timing appended to slide XML
+  | 'slideTransition' // Slide-to-slide transition → p:transition
   | 'custom';       // Extensible
 
 // Element record that needs post-processing
@@ -600,6 +632,8 @@ export interface StyleEnhancement {
    * enhancement resolves the group's spid and animates the whole subtree.
    */
   animationGroupData?: { groupName: string };
+  /** Pre-built `<p:transition>…</p:transition>` XML (type 'slideTransition'). */
+  slideTransitionXml?: string;
 }
 
 /**

@@ -8,6 +8,14 @@ export { convertHtmlToPng, type PngConversionResult } from './png-export';
 export { buildPngOutputPaths } from './utils/png-output-path';
 export * from './types';
 export {
+  listSlideTransitionEffectNames,
+  listRandomPoolEffects,
+  getSlideTransitionEffect,
+  isSlideTransitionEffectName,
+  SLIDE_TRANSITION_EFFECTS,
+} from './slide-transition/catalog';
+export { resolveSlideTransition, resolveSlideTransitionPlan } from './slide-transition/resolve';
+export {
   buildConversionReport,
   buildElementStats,
   buildFontStats,

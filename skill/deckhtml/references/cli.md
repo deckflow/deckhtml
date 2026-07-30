@@ -39,6 +39,9 @@ Stdin **requires** `-o` / `--output`.
 | `--json` | off | Machine-readable stdout |
 | `--quiet` | off | Conflicts with `--verbose` |
 | `-v, --verbose` | off | Logs on stderr |
+| `--no-animations` | off | Disable element entrance-animation export |
+| `--slide-transition <name>` | `random` | Slide-to-slide transition(s). Comma-separated names cycle (`fade,push,wipe`). See [slide-transitions.md](slide-transitions.md) |
+| `--no-slide-transitions` | off | Disable slide-to-slide transitions |
 | `--webhook <url>` | config | Cloud |
 | `--retention-hours <n>` | config (3) | Cloud, 0–99 |
 

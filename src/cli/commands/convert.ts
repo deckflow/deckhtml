@@ -37,6 +37,11 @@ import {
   DEFAULT_VIEWPORT_WIDTH,
   detectViewportFromFile,
 } from '../../utils/viewport';
+import {
+  listSlideTransitionEffectNames,
+  isSlideTransitionEffectName,
+} from '../../slide-transition/catalog';
+import type { ConversionOptions } from '../../types';
 
 const DEFAULT_TIMEOUT = 600;
 
@@ -56,6 +61,16 @@ export interface ConvertOptions {
   force?: boolean;
   /** commander --no-animations sets this to false (default true). */
   animations?: boolean;
+  /**
+   * Slide-to-slide transition effect name(s) (`fade`, `push`, or `fade,push,wipe`)
+   * or `random`. From `--slide-transition <name[,name…]>`. Default when unset: random.
+   */
+  slideTransition?: string;
+  /**
+   * commander `--no-slide-transitions` sets this to false (default true).
+   * When false, disables slide-to-slide transitions.
+   */
+  slideTransitions?: boolean;
 }
 
 function resolvePlatformOption(platform?: string): PlatformTarget {
@@ -72,6 +87,45 @@ function resolvePlatformOption(platform?: string): PlatformTarget {
 
 function toCloudPlatform(platform: PlatformTarget): CloudPlatform {
   return platform === 'mac' || platform === 'ios' ? 'mac' : 'win';
+}
+
+/**
+ * Map CLI flags onto ConversionOptions.slideTransitions.
+ * `--no-slide-transitions` wins; else `--slide-transition <name[,name…]>`; else random.
+ */
+function resolveCliSlideTransitions(
+  options: ConvertOptions
+): ConversionOptions['slideTransitions'] {
+  if (options.slideTransitions === false) return false;
+  const name = options.slideTransition?.trim();
+  if (!name) return true; // default: random
+  const lower = name.toLowerCase();
+  if (lower === 'none' || lower === 'off' || lower === 'false') return false;
+  if (lower === 'random') return 'random';
+
+  const parts = name
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (parts.length === 0) return true;
+
+  for (const part of parts) {
+    if (part === 'random') {
+      throw new Error(
+        'Invalid --slide-transition: "random" cannot be mixed with named effects; ' +
+          'use --slide-transition random alone, or a comma-separated catalog list'
+      );
+    }
+    if (!isSlideTransitionEffectName(part)) {
+      const known = listSlideTransitionEffectNames().join(', ');
+      throw new Error(
+        `Invalid --slide-transition effect "${part}". Available: ${known}, random, none`
+      );
+    }
+  }
+
+  // Preserve comma-separated form for the resolver (single or cycle).
+  return parts.join(',');
 }
 
 function buildCloudParams(
@@ -103,7 +157,8 @@ async function runLocalConvert(
   force?: boolean,
   excludeSelector?: string,
   identityAttribute?: string,
-  animations?: boolean
+  animations?: boolean,
+  slideTransitions?: ConversionOptions['slideTransitions']
 ): Promise<ConversionResultEnvelope> {
   const resolvedViewport =
     viewport ??
@@ -198,6 +253,7 @@ async function runLocalConvert(
     excludeSelector,
     identityAttribute,
     animations,
+    slideTransitions,
     browser: executablePath ? { executablePath } : undefined,
   });
 
@@ -371,6 +427,14 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       '--no-animations',
       'Disable entrance-animation export (data-animation*, CSS @keyframes/transitions, anime.js interception)'
     )
+    .option(
+      '--slide-transition <name>',
+      'Slide-to-slide transition effect(s). Comma-separated names cycle in order (default: random). Use "none" to disable'
+    )
+    .option(
+      '--no-slide-transitions',
+      'Disable slide-to-slide transition effects (p:transition)'
+    )
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {
         return;
@@ -419,6 +483,7 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
 
           const startedAt = Date.now();
           let envelope: ConversionResultEnvelope;
+          const slideTransitions = resolveCliSlideTransitions(options);
           if (mode === 'cloud') {
             envelope = await runCloudConvert(
               ctx,
@@ -441,7 +506,8 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               options.force,
               options.exclude,
               options.identityAttribute,
-              options.animations
+              options.animations,
+              slideTransitions
             );
           }
 
