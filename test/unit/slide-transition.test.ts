@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 import {
   buildTransitionXml,
   getSlideTransitionEffect,
+  listRandomPoolEffects,
   listSlideTransitionEffectNames,
+  listSlideTransitionEffectNamesByTier,
   SLIDE_TRANSITION_EFFECTS,
 } from '../../dist/slide-transition/catalog.js';
 import { resolveSlideTransition, resolveSlideTransitionPlan } from '../../dist/slide-transition/resolve.js';
@@ -31,12 +33,26 @@ const SLIDE_WITH_TIMING =
 describe('slide transition catalog', () => {
   it('exposes a stable non-empty effect list', () => {
     const names = listSlideTransitionEffectNames();
-    assert.ok(names.length >= 15);
+    assert.ok(names.length >= 50, `expected 50+ effects, got ${names.length}`);
     assert.ok(names.includes('fade'));
     assert.ok(names.includes('push'));
     assert.ok(names.includes('wipe'));
     assert.ok(names.includes('dissolve'));
     assert.equal(names.length, SLIDE_TRANSITION_EFFECTS.length);
+  });
+
+  it('covers the Office extension tiers', () => {
+    const base = listSlideTransitionEffectNamesByTier('base');
+    const ext = listSlideTransitionEffectNamesByTier('ext');
+    assert.ok(base.length >= 20);
+    assert.ok(ext.length >= 30);
+    for (const name of ['vortex', 'flip', 'ripple', 'glitter', 'doors', 'window']) {
+      assert.ok(ext.includes(name), `missing p14 effect ${name}`);
+    }
+    for (const name of ['fall-over', 'drape', 'curtains', 'peel-off', 'airplane', 'origami']) {
+      assert.ok(ext.includes(name), `missing p15 preset ${name}`);
+    }
+    assert.ok(ext.includes('morph'));
   });
 
   it('builds OOXML for fade / push / wipe', () => {
@@ -56,6 +72,58 @@ describe('slide transition catalog', () => {
       buildTransitionXml(wipe, { params: { speed: 'med', dir: 'd' } }),
       /<p:wipe dir="d"\/>/
     );
+  });
+
+  it('builds mc:AlternateContent with a base fallback for p14 effects', () => {
+    const doors = getSlideTransitionEffect('doors')!;
+    const xml = buildTransitionXml(doors, {
+      speed: 'slow',
+      params: { speed: 'slow', orient: 'vert' },
+    });
+    assert.ok(xml.startsWith('<mc:AlternateContent'), 'wrapped in AlternateContent');
+    assert.ok(xml.includes('xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'));
+    assert.ok(
+      xml.includes('xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"'),
+      'declares p14 namespace'
+    );
+    assert.ok(xml.includes('Requires="p14"'));
+    assert.ok(xml.includes('<p14:doors dir="vert"/>'));
+    assert.ok(xml.includes('<mc:Fallback><p:transition spd="slow"><p:split orient="horz" dir="out"/></p:transition></mc:Fallback>'));
+  });
+
+  it('builds p15 preset transitions via p15:prstTrans', () => {
+    const fallOver = getSlideTransitionEffect('fall-over')!;
+    const xml = buildTransitionXml(fallOver, { params: { speed: 'med' } });
+    assert.ok(
+      xml.includes('xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"'),
+      'declares p15 namespace'
+    );
+    assert.ok(xml.includes('Requires="p15"'));
+    assert.ok(xml.includes('<p15:prstTrans prst="fallOver"/>'));
+    assert.ok(xml.includes('<mc:Fallback>'), 'has base fallback');
+    assert.ok(xml.includes('<p:push dir="d"/>'), 'fallback is push down');
+  });
+
+  it('builds morph via p159:morph with byObject default', () => {
+    const morph = getSlideTransitionEffect('morph')!;
+    const xml = buildTransitionXml(morph, { params: { speed: 'med', option: 'byObject' } });
+    assert.ok(
+      xml.includes('xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"'),
+      'declares p159 namespace'
+    );
+    assert.ok(xml.includes('Requires="p159"'));
+    assert.ok(xml.includes('<p159:morph option="byObject"/>'));
+    assert.ok(xml.includes('<p:fade thruBlk="0"/>'), 'fallback is fade');
+  });
+
+  it('keeps morph / none / meta-random out of the generation-time random pool', () => {
+    const pool = listRandomPoolEffects().map((e) => e.name);
+    assert.ok(!pool.includes('morph'));
+    assert.ok(!pool.includes('none'));
+    assert.ok(!pool.includes('random'));
+    assert.ok(pool.includes('fade'));
+    assert.ok(pool.includes('doors'));
+    assert.ok(pool.includes('fall-over'));
   });
 });
 
@@ -78,6 +146,15 @@ describe('resolveSlideTransition', () => {
       () => resolveSlideTransition('not-a-real-effect'),
       /Unknown slide transition/
     );
+  });
+
+  it('resolves ext-tier effects to AlternateContent XML', () => {
+    const resolved = resolveSlideTransition('glitter');
+    assert.ok(resolved);
+    assert.equal(resolved!.effect, 'glitter');
+    assert.ok(resolved!.xml.includes('<mc:AlternateContent'));
+    assert.ok(resolved!.xml.includes('<p14:glitter'));
+    assert.ok(/pattern="(diamond|hexagon)"/.test(resolved!.xml));
   });
 });
 
@@ -185,6 +262,29 @@ describe('injectTransitionXml', () => {
     assert.equal((twice.match(/<p:transition/g) || []).length, 1);
     assert.ok(twice.includes('<p:wipe dir="u"/>'));
     assert.ok(!twice.includes('<p:fade'));
+  });
+
+  it('replaces a prior ext transition wrapped in mc:AlternateContent', () => {
+    const extXml = buildTransitionXml(getSlideTransitionEffect('doors')!, {
+      params: { speed: 'med', orient: 'vert' },
+    });
+    const once = injectTransitionXml(SLIDE_XML, extXml);
+    assert.ok(once.includes('<mc:AlternateContent'));
+
+    const twice = injectTransitionXml(
+      once,
+      '<p:transition spd="fast"><p:wipe dir="u"/></p:transition>'
+    );
+    assert.ok(!twice.includes('<mc:AlternateContent'), 'old ext wrapper removed');
+    assert.ok(!twice.includes('<p14:doors'));
+    assert.equal((twice.match(/<p:transition/g) || []).length, 1);
+    assert.ok(twice.includes('<p:wipe dir="u"/>'));
+
+    // …and the reverse: plain replaced by ext
+    const thrice = injectTransitionXml(twice, extXml);
+    assert.ok(thrice.includes('<mc:AlternateContent'));
+    assert.ok(!thrice.includes('<p:wipe'));
+    assert.equal((thrice.match(/<mc:AlternateContent/g) || []).length, 1);
   });
 
   it('applySlideTransitionToXml reads enhancement payload', () => {

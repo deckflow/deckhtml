@@ -11,8 +11,13 @@ import type { StyleEnhancement } from '../types';
  * Replaces any existing `<p:transition>…</p:transition>`.
  */
 export function injectTransitionXml(slideXml: string, transitionXml: string): string {
-  // Drop any existing transition (simple non-AlternateContent form).
-  let xml = slideXml.replace(/<p:transition\b[^>]*>[\s\S]*?<\/p:transition>/g, '');
+  // Drop any existing transition — both the plain form and extended
+  // transitions wrapped in mc:AlternateContent (p14/p15/p159 effects).
+  let xml = slideXml.replace(
+    /<mc:AlternateContent\b[^>]*>[\s\S]*?<\/mc:AlternateContent>/g,
+    (block) => (block.includes('<p:transition') ? '' : block)
+  );
+  xml = xml.replace(/<p:transition\b[^>]*>[\s\S]*?<\/p:transition>/g, '');
   xml = xml.replace(/<p:transition\b[^>]*\/>/g, '');
 
   const timingIdx = xml.indexOf('<p:timing');

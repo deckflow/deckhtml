@@ -51,7 +51,9 @@ await convertHtmlToPptx({
 console.log(listSlideTransitionEffectNames());
 ```
 
-## Effect catalog
+## Effect catalog (55 effects)
+
+### Base tier — ISO/IEC 29500 (works in every OOXML renderer)
 
 | Name | Description |
 | --- | --- |
@@ -76,13 +78,75 @@ console.log(listSlideTransitionEffectNames());
 | `dissolve` | Pixel dissolve |
 | `zoom` | Zoom in / out |
 | `cut` | Hard cut |
+| `none` | Explicit no-transition marker (never picked at random) |
 | `random` | PowerPoint picks at **show time** (meta) |
 
-Generation-time `random` (the default) picks a **concrete** effect from the catalog (excluding meta `random`) **independently for each slide**, so page turns stay varied. Directional variants (push/wipe/…) also get a random direction. Pass a named effect to apply the same transition everywhere.
+### Extended tier — `p14` (PowerPoint 2010+)
+
+Written as `mc:AlternateContent` with a base fallback, so older renderers still play a sensible effect.
+
+| Name | Description | Base fallback |
+| --- | --- | --- |
+| `conveyor` | Conveyor belt | push |
+| `doors` | Elevator doors open | split |
+| `ferris` | Ferris wheel swing | push |
+| `flash` | Bright flash blink | fade |
+| `flip` | Flip like a card | push |
+| `flythrough` | Swoop into / out of the screen | zoom |
+| `gallery` | Rotate like a gallery wall | push |
+| `glitter` | Sparkle (diamond / hexagon pieces) | dissolve |
+| `honeycomb` | Hexagonal-cell tumble | dissolve |
+| `pan` | Camera pan | push |
+| `prism` | 3D prism rotation | push |
+| `reveal` | Soft reveal from one side | fade |
+| `ripple` | Water ripples (corners / center) | circle / fade |
+| `shred` | Shred into strips / rectangles | blinds |
+| `switch` | Slides swap with a spin | push |
+| `vortex` | Swirl away toward one edge | fade |
+| `warp` | Sci-fi warp in / out | zoom |
+| `wheel-reverse` | Counter-clockwise wheel | wheel |
+| `window` | Appear in a rotating window frame | split |
+
+### Preset tier — `p15:prstTrans` (PowerPoint 2013+)
+
+| Name | Description | Base fallback |
+| --- | --- | --- |
+| `fall-over` | Old slide tips over and falls | push |
+| `drape` | New slide drapes over like cloth | cover |
+| `curtains` | Theatre curtains part | split |
+| `wind` | Old slide blown away | push |
+| `prestige` | Old slide shatters and floats off | dissolve |
+| `fracture` | Old slide cracks apart | fade |
+| `crush` | Old slide crushed away | fade |
+| `peel-off` | Peel off like a sticker | pull |
+| `page-curl-single` | Single-corner page curl | pull |
+| `page-curl-double` | Double-corner page curl | pull |
+| `airplane` | Fold into a paper plane and fly off | push |
+| `origami` | Fold away like paper | push |
+
+### Morph tier — `p159` (PowerPoint 2019 / Microsoft 365)
+
+| Name | Description | Base fallback |
+| --- | --- | --- |
+| `morph` | Animate shared objects smoothly between slides | fade |
+
+`morph` is **excluded from the generation-time random pool** (together with `none` and meta `random`): it only looks right when consecutive slides share matching objects. Request it explicitly (`--slide-transition morph`) for decks authored with object continuity.
+
+Generation-time `random` (the default) picks a **concrete** effect from the remaining catalog **independently for each slide**, so page turns stay varied. Directional variants (push/wipe/vortex/…) also get a random direction. Pass a named effect to apply the same transition everywhere.
 
 ## Speed
 
 Via API object only: `speed: 'slow' | 'med' | 'fast'` (default `med`).
+
+## Compatibility
+
+| Renderer | Base tier | `p14` | `p15` presets | `p159` morph |
+| --- | --- | --- | --- | --- |
+| PowerPoint 2010+ | yes | yes | 2013+ | 2019 / M365 |
+| LibreOffice Impress | yes | fallback | fallback | fallback |
+| Keynote / Google Slides (import) | mostly | fallback | fallback | fallback |
+
+Extended effects are wrapped in `mc:AlternateContent`; renderers that don't understand the extension namespace play the **base fallback** transition instead, so the deck always degrades gracefully.
 
 ## Notes
 

@@ -9,6 +9,7 @@ export { buildPngOutputPaths } from './utils/png-output-path';
 export * from './types';
 export {
   listSlideTransitionEffectNames,
+  listSlideTransitionEffectNamesByTier,
   listRandomPoolEffects,
   getSlideTransitionEffect,
   isSlideTransitionEffectName,

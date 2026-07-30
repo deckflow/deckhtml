@@ -95,6 +95,9 @@ describe('DH-P0-010 OOXML self-check & determinism', () => {
       viewportHeight: 720,
       quiet: true,
       allowLocalResources: true,
+      // Seeded so per-slide random transitions are identical across runs —
+      // canonical equivalence asserts layout determinism, not RNG luck.
+      slideTransitions: { effect: 'random', seed: 42 },
     };
     const [resultA, resultB] = await Promise.all([
       convertHtmlToPptx(opts),
