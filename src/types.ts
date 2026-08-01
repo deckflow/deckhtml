@@ -85,6 +85,16 @@ export interface ConversionOptions {
    * - object: `{ effect?, effects?, speed?, seed?, enabled? }`
    */
   slideTransitions?: boolean | string | SlideTransitionOptions;
+  /**
+   * How to handle `<iframe>` elements (default: `'inspect'`).
+   * - `'inspect'`: open iframe document in a new Playwright page sized to the
+   *   iframe CSS box, extract editable elements, fall back to screenshot on failure
+   * - `'screenshot'`: always rasterize the iframe as an image
+   * - `'skip'`: omit iframe content from the PPTX
+   */
+  iframes?: 'inspect' | 'screenshot' | 'skip';
+  /** Timeout for loading iframe documents in a new page (default: 8000ms). */
+  iframeLoadTimeoutMs?: number;
 }
 
 export interface SlideTransitionOptions {
@@ -225,6 +235,22 @@ export interface ElementInfo {
   ommlXml?: string;
   /** Plain text for mc:Fallback when embedding OMML in PPT */
   mathFallbackText?: string;
+  /** iframe src attribute (may be relative; resolved against iframeBaseUrl). */
+  iframeSrc?: string;
+  /** iframe srcdoc HTML when present. */
+  iframeSrcdoc?: string;
+  /** iframe name attribute (for frame matching / diagnostics). */
+  iframeName?: string;
+  /** Stable CSS selector stamped for Playwright locator (screenshot fallback). */
+  iframeSelector?: string;
+  /** Layout content width (px) before CSS transform scale — used as child viewport width. */
+  iframeContentWidth?: number;
+  /** Layout content height (px) before CSS transform scale — used as child viewport height. */
+  iframeContentHeight?: number;
+  /** CSS transform scale factor on the iframe element (default 1). */
+  iframeScale?: number;
+  /** Parent document URL for resolving relative iframe src. */
+  iframeBaseUrl?: string;
   /** How this element was rasterized instead of native PPTX conversion */
   rasterMethod?: RasterMethod;
   /** Why native conversion was skipped (e.g. chart-canvas, svg-flowchart) */
@@ -379,7 +405,8 @@ export type ElementType =
   | 'math'
   | 'table'
   | 'shape'
-  | 'container';
+  | 'container'
+  | 'iframe';
 
 export interface ComputedStyles {
   // Text properties

@@ -298,6 +298,36 @@ export class HTMLLoader {
 
     // Match prior slide-isolation settle (entrance animations / delayed reveals).
     await gotoAndSettle(page, documentUrl, { settleMs: 3000 });
+
+    // Best-effort: wait for iframe documents to fire load (helps HTML screenshots
+    // and iframe screenshot fallback). Cross-origin frames still emit load.
+    await page
+      .evaluate(async () => {
+        const frames = Array.from(document.querySelectorAll('iframe'));
+        if (frames.length === 0) return;
+        await Promise.all(
+          frames.map(
+            (frame) =>
+              new Promise<void>((resolve) => {
+                const done = () => resolve();
+                try {
+                  if (
+                    frame.contentDocument &&
+                    frame.contentDocument.readyState === 'complete'
+                  ) {
+                    done();
+                    return;
+                  }
+                } catch {
+                  // cross-origin: fall through to load / timeout
+                }
+                frame.addEventListener('load', done, { once: true });
+                setTimeout(done, 3000);
+              })
+          )
+        );
+      })
+      .catch(() => {});
   }
 
   /**

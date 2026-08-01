@@ -228,6 +228,9 @@ export class ElementConverter {
       case 'canvas':
         mainElement = this.convertCanvasElement(element, baseProps);
         break;
+      case 'iframe':
+        // Placeholders are resolved in the inspector; defensive no-op.
+        return [];
       case 'svg':
         mainElement = this.convertImageElement(element, baseProps);
         break;

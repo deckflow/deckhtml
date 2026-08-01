@@ -4,10 +4,19 @@
  */
 
 import { Page } from 'playwright-core';
+import { fileURLToPath } from 'url';
 import { ElementInfo, ElementType, ComputedStyles, TableData } from './types';
 import { getSlideHeightPx, getSlideWidthPx } from './utils/coordinate';
 import { convertMathmlToOmml } from './utils/mathml-to-omml';
 import { isLightTextColor } from './utils/omml-style';
+import { gotoAndSettle } from './utils/navigate';
+import { setupResourcePolicyOnPage } from './utils/resource-policy';
+import { installAnimeInterceptor } from './animation/anime-interceptor';
+import { RULE_IDS } from './utils/diagnostics';
+import type { SvgPathCommandPx } from './types';
+
+const DEFAULT_IFRAME_LOAD_TIMEOUT_MS = 8000;
+const DEFAULT_IFRAME_MAX_DEPTH = 3;
 
 /** Declarative rule for auto-detecting multi-page slide hosts. */
 export interface SlideProbeRule {
@@ -53,6 +62,23 @@ export interface InspectElementsOptions {
   identityDiagnostics?: import('./utils/diagnostics').Diagnostic[];
   /** Mutable accumulator for excluded element count (DH-P0-002). */
   excludedCount?: { value: number };
+  /**
+   * How to handle `<iframe>` elements (default: `'inspect'`).
+   * Inspect opens the iframe document in a new page sized to the iframe box.
+   */
+  iframes?: 'inspect' | 'screenshot' | 'skip';
+  /** Timeout for loading iframe documents (default: 8000ms). */
+  iframeLoadTimeoutMs?: number;
+  /** Current iframe nesting depth (internal; default 0). */
+  iframeDepth?: number;
+  /** Max iframe nesting depth (default 3). */
+  iframeMaxDepth?: number;
+  /** Allow local file:// subresources when loading iframe documents. */
+  allowLocalResources?: boolean;
+  /** Explicit resource policy for iframe child pages. */
+  resourcePolicy?: import('./utils/resource-policy').ResourcePolicy;
+  /** Collector for iframe-related diagnostics. */
+  iframeDiagnostics?: import('./utils/diagnostics').Diagnostic[];
 }
 
 const SLIDE_INDEX_ATTR = 'data-deckhtml-slide-index';
@@ -3771,6 +3797,7 @@ export class ElementInspector {
           if (tag === 'video') return 'video';
           if (tag === 'audio') return 'audio';
           if (tag === 'canvas') return 'canvas';
+          if (tag === 'iframe') return 'iframe';
           if (tag === 'math') return 'math';
           if (tag === 'svg') return 'svg';
           if (tag === 'table') return 'table';
@@ -5373,6 +5400,67 @@ export class ElementInspector {
             return;
           }
 
+          // iframe: record a placeholder; Node side opens the document in a new page.
+          if (type === 'iframe') {
+            const iframeEl = element as HTMLIFrameElement;
+            const iframeId = `iframe-${Math.random().toString(36).slice(2, 10)}`;
+            iframeEl.setAttribute('data-deckhtml-iframe', iframeId);
+            const styles = getComputedStyles(iframeEl);
+            const contentW = Math.max(1, Math.round(iframeEl.offsetWidth || iframeEl.clientWidth || rect.width));
+            const contentH = Math.max(1, Math.round(iframeEl.offsetHeight || iframeEl.clientHeight || rect.height));
+            let scale = 1;
+            const transform = window.getComputedStyle(iframeEl).transform;
+            if (transform && transform !== 'none') {
+              const m2 = transform.match(/^matrix\(([^)]+)\)$/);
+              const m3 = transform.match(/^matrix3d\(([^)]+)\)$/);
+              if (m2) {
+                const p = m2[1].split(',').map((v) => parseFloat(v.trim()));
+                const a = p[0] ?? 1;
+                const b = p[1] ?? 0;
+                scale = Math.sqrt(a * a + b * b) || 1;
+              } else if (m3) {
+                const p = m3[1].split(',').map((v) => parseFloat(v.trim()));
+                const a = p[0] ?? 1;
+                const b = p[1] ?? 0;
+                scale = Math.sqrt(a * a + b * b) || 1;
+              } else {
+                const sm = transform.match(/scale\(\s*([-\d.]+)(?:\s*,\s*([-\d.]+))?\s*\)/);
+                if (sm) scale = Math.abs(parseFloat(sm[1])) || 1;
+              }
+            }
+            // Prefer visual/content ratio when transform parsing is ambiguous.
+            if (contentW > 0 && rect.width > 0) {
+              const ratio = rect.width / contentW;
+              if (Math.abs(ratio - scale) > 0.02 && ratio > 0.05 && ratio < 20) {
+                scale = ratio;
+              }
+            }
+            const srcAttr = iframeEl.getAttribute('src') || '';
+            const srcdoc = iframeEl.getAttribute('srcdoc') || '';
+            result.push({
+              type: 'iframe',
+              tag: 'iframe',
+              elementId: readElementIdentity(element),
+              animationRaw: readAnimationRaw(element),
+              animationGroupId: readAnimationGroupId(element),
+              x: rect.left,
+              y: rect.top,
+              width: rect.width,
+              height: rect.height,
+              styles,
+              iframeSrc: iframeEl.src || srcAttr || undefined,
+              iframeSrcdoc: srcdoc || undefined,
+              iframeName: iframeEl.name || undefined,
+              iframeSelector: `[data-deckhtml-iframe="${iframeId}"]`,
+              iframeContentWidth: contentW,
+              iframeContentHeight: contentH,
+              iframeScale: scale,
+              iframeBaseUrl: document.baseURI || location.href,
+            });
+            markDomAsPptxMapped(iframeEl);
+            return;
+          }
+
           // SVG elements are saved as SVG images (not decomposed into shapes).
           if (type === 'svg') {
             if ((element as any).closest?.('mjx-container')) {
@@ -6295,6 +6383,9 @@ export class ElementInspector {
       el.ommlXml = converted.omml;
     }
 
+    // Resolve iframe placeholders into editable child elements (or screenshot/skip).
+    await this.resolveIframes(elements as ElementInfo[], options);
+
     // Isolated screenshot backfill: remove every other box from layout (display:none)
     // so Playwright's element screenshot cannot composite separate PPTX layers (text,
     // icons, etc.) into the PNG. Keep the host and its ancestor chain visible.
@@ -6440,6 +6531,514 @@ export class ElementInspector {
     }
 
     return elements as ElementInfo[];
+  }
+
+  /**
+   * Replace iframe placeholders with inspected child elements, screenshots, or remove them.
+   */
+  private async resolveIframes(
+    elements: ElementInfo[],
+    options?: InspectElementsOptions
+  ): Promise<void> {
+    const mode = options?.iframes ?? 'inspect';
+    if (mode === 'skip') {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        if (elements[i]?.type === 'iframe') elements.splice(i, 1);
+      }
+      return;
+    }
+
+    const depth = options?.iframeDepth ?? 0;
+    const maxDepth = options?.iframeMaxDepth ?? DEFAULT_IFRAME_MAX_DEPTH;
+    const timeoutMs = options?.iframeLoadTimeoutMs ?? DEFAULT_IFRAME_LOAD_TIMEOUT_MS;
+    const diagnostics = options?.iframeDiagnostics;
+
+    // Collect indices first — splice while iterating would skip entries.
+    const iframeIndices: number[] = [];
+    for (let i = 0; i < elements.length; i++) {
+      if (elements[i]?.type === 'iframe') iframeIndices.push(i);
+    }
+    if (iframeIndices.length === 0) return;
+
+    // Process from the end so splice offsets stay valid.
+    for (let k = iframeIndices.length - 1; k >= 0; k--) {
+      const index = iframeIndices[k]!;
+      const placeholder = elements[index]!;
+      const selector = placeholder.iframeSelector;
+
+      if (depth >= maxDepth) {
+        diagnostics?.push({
+          rule_id: RULE_IDS.IFRAME_NESTED_TOO_DEEP,
+          severity: 'warning',
+          element_id: placeholder.elementId ?? null,
+          message: `iframe nesting exceeded max depth ${maxDepth}; falling back to screenshot`,
+          recovery: 'Reduce nested iframes or raise iframeMaxDepth',
+        });
+        const shot = await this.screenshotIframePlaceholder(placeholder);
+        if (shot) {
+          elements.splice(index, 1, shot);
+        } else {
+          elements.splice(index, 1);
+        }
+        continue;
+      }
+
+      if (mode === 'screenshot') {
+        const shot = await this.screenshotIframePlaceholder(placeholder);
+        if (shot) {
+          elements.splice(index, 1, shot);
+        } else {
+          elements.splice(index, 1);
+          diagnostics?.push({
+            rule_id: RULE_IDS.IFRAME_INSPECT_FAILED,
+            severity: 'warning',
+            element_id: placeholder.elementId ?? null,
+            message: `iframe screenshot failed (${selector ?? placeholder.iframeSrc ?? 'unknown'})`,
+          });
+        }
+        continue;
+      }
+
+      // mode === 'inspect'
+      try {
+        const childElements = await this.inspectIframeInNewPage(placeholder, {
+          ...options,
+          iframeDepth: depth + 1,
+          iframeLoadTimeoutMs: timeoutMs,
+        });
+        if (childElements.length === 0) {
+          throw new Error('iframe inspect returned no elements');
+        }
+        // The child page emits its <body> background as a full-viewport raster
+        // (emitPageBackgroundRasterIfAny). That raster is a sharp rectangle which
+        // would cover the iframe chrome's rounded corners. Extract the body
+        // background and merge it into the chrome shape (a roundRect that already
+        // carries the iframe's border-radius) so the visible fill respects the
+        // rounded corners.
+        const bodyBgIndex = childElements.findIndex(
+          (el) => el?.tag === 'body.page-bg'
+        );
+        let bodyBg: ElementInfo['styles'] | undefined;
+        if (bodyBgIndex >= 0) {
+          const bodyBgEl = childElements[bodyBgIndex]!;
+          bodyBg = bodyBgEl.styles;
+          childElements.splice(bodyBgIndex, 1);
+        }
+        const frameChrome = this.buildIframeChromeShape(placeholder, bodyBg);
+        const replacement = frameChrome
+          ? [frameChrome, ...childElements]
+          : childElements;
+        elements.splice(index, 1, ...replacement);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.warn(`⚠️  iframe inspect failed, using screenshot: ${reason}`);
+        diagnostics?.push({
+          rule_id: RULE_IDS.IFRAME_INSPECT_FAILED,
+          severity: 'warning',
+          element_id: placeholder.elementId ?? null,
+          message: `iframe inspect failed (${selector ?? placeholder.iframeSrc ?? 'unknown'}): ${reason}`,
+          recovery: 'Check iframe src/srcdoc availability; conversion fell back to screenshot',
+        });
+        const shot = await this.screenshotIframePlaceholder(placeholder);
+        if (shot) {
+          elements.splice(index, 1, shot);
+        } else {
+          elements.splice(index, 1);
+        }
+      }
+    }
+  }
+
+  /**
+   * Open the iframe document in a new page sized to the iframe CSS box and inspect it.
+   */
+  private async inspectIframeInNewPage(
+    placeholder: ElementInfo,
+    options?: InspectElementsOptions
+  ): Promise<ElementInfo[]> {
+    const contentW = Math.max(
+      1,
+      Math.round(placeholder.iframeContentWidth || placeholder.width || 1)
+    );
+    const contentH = Math.max(
+      1,
+      Math.round(placeholder.iframeContentHeight || placeholder.height || 1)
+    );
+    const scale =
+      typeof placeholder.iframeScale === 'number' &&
+      !Number.isNaN(placeholder.iframeScale) &&
+      placeholder.iframeScale > 0
+        ? placeholder.iframeScale
+        : 1;
+    const timeoutMs = options?.iframeLoadTimeoutMs ?? DEFAULT_IFRAME_LOAD_TIMEOUT_MS;
+    const context = this.page.context();
+    const childPage = await context.newPage();
+
+    try {
+      await childPage.setViewportSize({ width: contentW, height: contentH });
+
+      await installAnimeInterceptor(childPage);
+
+      const loadTarget = await this.resolveIframeLoadTarget(placeholder);
+      if (!loadTarget) {
+        throw new Error('iframe has no loadable src/srcdoc/blob content');
+      }
+
+      if (loadTarget.kind === 'url') {
+        const inputForPolicy =
+          loadTarget.url.startsWith('file:')
+            ? (() => {
+                try {
+                  return fileURLToPath(loadTarget.url);
+                } catch {
+                  return loadTarget.url;
+                }
+              })()
+            : loadTarget.url;
+        await setupResourcePolicyOnPage(childPage, inputForPolicy, {
+          allowLocalResources: options?.allowLocalResources,
+          policy: options?.resourcePolicy,
+        });
+        await gotoAndSettle(childPage, loadTarget.url, {
+          navigationTimeoutMs: timeoutMs,
+          networkIdleTimeoutMs: Math.min(timeoutMs, 10_000),
+          settleMs: Math.min(2000, Math.max(500, Math.floor(timeoutMs / 4))),
+        });
+      } else {
+        // srcdoc / inline HTML — optional <base> for relative assets.
+        const baseHref = placeholder.iframeBaseUrl || this.page.url();
+        const html = /<base\s/i.test(loadTarget.html)
+          ? loadTarget.html
+          : `<base href="${baseHref.replace(/"/g, '&quot;')}">` + loadTarget.html;
+        // Best-effort resource policy keyed off parent document.
+        try {
+          const parentUrl = this.page.url();
+          const policyInput = parentUrl.startsWith('file:')
+            ? fileURLToPath(parentUrl)
+            : parentUrl || 'about:blank';
+          await setupResourcePolicyOnPage(childPage, policyInput, {
+            allowLocalResources: options?.allowLocalResources,
+            policy: options?.resourcePolicy,
+          });
+        } catch {
+          // ignore policy setup failures for srcdoc
+        }
+        await childPage.setContent(html, {
+          waitUntil: 'domcontentloaded',
+          timeout: timeoutMs,
+        });
+        await childPage
+          .waitForLoadState('networkidle', { timeout: Math.min(timeoutMs, 10_000) })
+          .catch(() => {});
+        await Promise.race([
+          childPage.evaluate(() => document.fonts.ready),
+          childPage.waitForTimeout(2000),
+        ]);
+        await childPage.waitForTimeout(500);
+      }
+
+      const childInspector = new ElementInspector(childPage);
+      const childElements = await childInspector.inspectElements(undefined, {
+        ...options,
+        inputIsSvg: false,
+        // Nested resolveIframes runs inside this call via iframeDepth.
+      });
+
+      this.offsetIframeElements(childElements, placeholder.x, placeholder.y, scale);
+      return childElements;
+    } finally {
+      await childPage.close().catch(() => {});
+    }
+  }
+
+  /**
+   * Resolve what to load into the child page for an iframe placeholder.
+   */
+  private async resolveIframeLoadTarget(
+    placeholder: ElementInfo
+  ): Promise<{ kind: 'url'; url: string } | { kind: 'html'; html: string } | null> {
+    if (placeholder.iframeSrcdoc && placeholder.iframeSrcdoc.trim()) {
+      return { kind: 'html', html: placeholder.iframeSrcdoc };
+    }
+
+    const rawSrc = (placeholder.iframeSrc || '').trim();
+    if (!rawSrc || rawSrc === 'about:blank') {
+      // Last chance: read live srcdoc / blob from the parent DOM.
+      if (placeholder.iframeSelector) {
+        const live = await this.page
+          .evaluate(async (sel) => {
+            const el = document.querySelector(sel) as HTMLIFrameElement | null;
+            if (!el) return null;
+            if (el.srcdoc && el.srcdoc.trim()) return { kind: 'html' as const, html: el.srcdoc };
+            const src = el.src || el.getAttribute('src') || '';
+            if (src.startsWith('blob:')) {
+              try {
+                const res = await fetch(src);
+                const html = await res.text();
+                return { kind: 'html' as const, html };
+              } catch {
+                return null;
+              }
+            }
+            if (src && src !== 'about:blank') return { kind: 'url' as const, url: src };
+            return null;
+          }, placeholder.iframeSelector)
+          .catch(() => null);
+        if (live) return live;
+      }
+      return null;
+    }
+
+    if (rawSrc.startsWith('blob:')) {
+      if (placeholder.iframeSelector) {
+        const html = await this.page
+          .evaluate(async (sel) => {
+            const el = document.querySelector(sel) as HTMLIFrameElement | null;
+            const src = el?.src || '';
+            if (!src.startsWith('blob:')) return null;
+            try {
+              const res = await fetch(src);
+              return await res.text();
+            } catch {
+              return null;
+            }
+          }, placeholder.iframeSelector)
+          .catch(() => null);
+        if (html) return { kind: 'html', html };
+      }
+      return null;
+    }
+
+    if (rawSrc.startsWith('data:text/html')) {
+      try {
+        const comma = rawSrc.indexOf(',');
+        if (comma < 0) return null;
+        const meta = rawSrc.slice(0, comma);
+        const data = rawSrc.slice(comma + 1);
+        const html = /;base64/i.test(meta)
+          ? Buffer.from(data, 'base64').toString('utf8')
+          : decodeURIComponent(data);
+        return { kind: 'html', html };
+      } catch {
+        return null;
+      }
+    }
+
+    try {
+      const base = placeholder.iframeBaseUrl || this.page.url() || 'about:blank';
+      const absolute = new URL(rawSrc, base).href;
+      return { kind: 'url', url: absolute };
+    } catch {
+      return { kind: 'url', url: rawSrc };
+    }
+  }
+
+  /**
+   * Translate + scale child-page element coordinates into the parent slide space.
+   */
+  private offsetIframeElements(
+    elements: ElementInfo[],
+    offsetX: number,
+    offsetY: number,
+    scale: number
+  ): void {
+    const s = scale > 0 ? scale : 1;
+    const scaleCmd = (cmd: SvgPathCommandPx): SvgPathCommandPx => {
+      if (cmd.type === 'Z') return cmd;
+      if (cmd.type === 'M' || cmd.type === 'L') {
+        return { type: cmd.type, x: cmd.x * s, y: cmd.y * s };
+      }
+      if (cmd.type === 'C') {
+        return {
+          type: 'C',
+          x1: cmd.x1 * s,
+          y1: cmd.y1 * s,
+          x2: cmd.x2 * s,
+          y2: cmd.y2 * s,
+          x: cmd.x * s,
+          y: cmd.y * s,
+        };
+      }
+      if (cmd.type === 'A') {
+        const arc = cmd as Extract<SvgPathCommandPx, { type: 'A' }>;
+        return {
+          type: 'A',
+          rx: arc.rx * s,
+          ry: arc.ry * s,
+          rot: arc.rot,
+          large: arc.large,
+          sweep: arc.sweep,
+          x: arc.x * s,
+          y: arc.y * s,
+        };
+      }
+      return cmd;
+    };
+
+    for (const el of elements) {
+      el.x = offsetX + el.x * s;
+      el.y = offsetY + el.y * s;
+      el.width = el.width * s;
+      el.height = el.height * s;
+
+      if (el.svgLineEndpoints) {
+        el.svgLineEndpoints = {
+          x1: offsetX + el.svgLineEndpoints.x1 * s,
+          y1: offsetY + el.svgLineEndpoints.y1 * s,
+          x2: offsetX + el.svgLineEndpoints.x2 * s,
+          y2: offsetY + el.svgLineEndpoints.y2 * s,
+        };
+      }
+      // Relative to element bbox — scale only.
+      if (el.clipPathPolygonPx) {
+        el.clipPathPolygonPx = el.clipPathPolygonPx.map((p) => ({
+          x: p.x * s,
+          y: p.y * s,
+        }));
+      }
+      if (el.svgPathCommandsPx) {
+        el.svgPathCommandsPx = el.svgPathCommandsPx.map(scaleCmd);
+      }
+      if (el.svgMarkerShapes) {
+        for (const m of el.svgMarkerShapes) {
+          m.x = offsetX + m.x * s;
+          m.y = offsetY + m.y * s;
+          m.width *= s;
+          m.height *= s;
+          if (m.clipPathPolygonPx) {
+            m.clipPathPolygonPx = m.clipPathPolygonPx.map((p) => ({
+              x: p.x * s,
+              y: p.y * s,
+            }));
+          }
+        }
+      }
+      if (typeof el.listMarkerOffset === 'number') el.listMarkerOffset *= s;
+      if (typeof el.beforePseudoWidthPx === 'number') el.beforePseudoWidthPx *= s;
+      if (typeof el.textFlowExtraMarginLeftPx === 'number') {
+        el.textFlowExtraMarginLeftPx *= s;
+      }
+      if (typeof el.parentBorderRadiusPx === 'number') el.parentBorderRadiusPx *= s;
+    }
+  }
+
+  /**
+   * Emit the iframe element's own border/fill as a shape so the frame chrome
+   * is preserved after the placeholder is replaced by child content.
+   *
+   * When `bodyBg` is provided (extracted from the child page's rasterized
+   * `<body>` background), the chrome shape adopts it as its fill so the visible
+   * background respects the iframe's border-radius. Without this, the body
+   * background would be emitted as a separate sharp rectangle image that covers
+   * the chrome shape's rounded corners.
+   */
+  private buildIframeChromeShape(
+    placeholder: ElementInfo,
+    bodyBg?: ElementInfo['styles']
+  ): ElementInfo | null {
+    const styles = placeholder.styles || {};
+    const bg = styles.backgroundColor;
+    const hasBg =
+      !!bg &&
+      bg !== 'rgba(0, 0, 0, 0)' &&
+      bg !== 'transparent' &&
+      bg !== 'none';
+    const borderWidth = typeof styles.borderWidth === 'number' ? styles.borderWidth : 0;
+    const hasBorder =
+      borderWidth > 0 ||
+      [styles.borderLeftWidth, styles.borderRightWidth, styles.borderTopWidth, styles.borderBottomWidth]
+        .some((w) => (typeof w === 'string' ? parseFloat(w) : 0) > 0);
+
+    // The child page <body> background is what the user actually sees inside
+    // the iframe (it sits on top of the iframe element's own background). When
+    // we extracted it from the rasterized page-bg element, prefer it for the
+    // chrome fill so the rounded shape shows the correct color/gradient.
+    const mergedBg = bodyBg?.backgroundColor;
+    const mergedBgImage = bodyBg?.backgroundImage;
+    const hasMergedBg =
+      !!mergedBg &&
+      mergedBg !== 'rgba(0, 0, 0, 0)' &&
+      mergedBg !== 'transparent' &&
+      mergedBg !== 'none';
+    const hasMergedBgImage =
+      !!mergedBgImage && mergedBgImage !== 'none';
+
+    // Emit a chrome shape when the iframe has its own bg/border OR when we
+    // have a merged body background to render (so the body fill still gets
+    // the rounded corners even if the iframe element itself is transparent).
+    if (!hasBg && !hasBorder && !hasMergedBg && !hasMergedBgImage) return null;
+
+    return {
+      type: 'shape',
+      tag: 'iframe-chrome',
+      elementId: placeholder.elementId,
+      animationGroupId: placeholder.animationGroupId,
+      x: placeholder.x,
+      y: placeholder.y,
+      width: placeholder.width,
+      height: placeholder.height,
+      styles: {
+        backgroundColor: hasMergedBg ? mergedBg : (hasBg ? bg : undefined),
+        backgroundImage: hasMergedBgImage ? mergedBgImage : styles.backgroundImage,
+        borderColor: styles.borderColor,
+        borderWidth: styles.borderWidth,
+        borderStyle: styles.borderStyle,
+        borderRadius: styles.borderRadius,
+        borderLeftWidth: styles.borderLeftWidth,
+        borderRightWidth: styles.borderRightWidth,
+        borderTopWidth: styles.borderTopWidth,
+        borderBottomWidth: styles.borderBottomWidth,
+        borderLeftColor: styles.borderLeftColor,
+        borderRightColor: styles.borderRightColor,
+        borderTopColor: styles.borderTopColor,
+        borderBottomColor: styles.borderBottomColor,
+        borderLeftStyle: styles.borderLeftStyle,
+        borderRightStyle: styles.borderRightStyle,
+        borderTopStyle: styles.borderTopStyle,
+        borderBottomStyle: styles.borderBottomStyle,
+        opacity: styles.opacity,
+        zIndex: typeof styles.zIndex === 'number' ? styles.zIndex - 1 : undefined,
+      },
+    };
+  }
+
+  /**
+   * Rasterize the iframe element as it appears on the parent page.
+   */
+  private async screenshotIframePlaceholder(
+    placeholder: ElementInfo
+  ): Promise<ElementInfo | null> {
+    const selector = placeholder.iframeSelector;
+    if (!selector) return null;
+    try {
+      const locator = this.page.locator(selector);
+      if ((await locator.count()) === 0) return null;
+      const buffer = await locator.first().screenshot({
+        type: 'png',
+        omitBackground: false,
+      });
+      return {
+        type: 'image',
+        tag: 'iframe',
+        elementId: placeholder.elementId,
+        animationRaw: placeholder.animationRaw,
+        animationGroupId: placeholder.animationGroupId,
+        x: placeholder.x,
+        y: placeholder.y,
+        width: placeholder.width,
+        height: placeholder.height,
+        styles: {
+          ...placeholder.styles,
+          // Screenshot already bakes opacity into pixels.
+          opacity: 1,
+        },
+        dataUrl: `data:image/png;base64,${buffer.toString('base64')}`,
+        screenshotBakesOpacity: true,
+      };
+    } catch (e) {
+      console.warn('Failed to screenshot iframe:', e);
+      return null;
+    }
   }
 
   /**

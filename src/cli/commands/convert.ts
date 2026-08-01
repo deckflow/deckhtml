@@ -71,6 +71,13 @@ export interface ConvertOptions {
    * When false, disables slide-to-slide transitions.
    */
   slideTransitions?: boolean;
+  /**
+   * How to handle `<iframe>` elements: `inspect` (default), `screenshot`, or `skip`.
+   * From `--iframes <mode>`. Local mode only.
+   */
+  iframes?: string;
+  /** Timeout (ms) for loading iframe documents in a new page. From `--iframe-load-timeout-ms`. */
+  iframeLoadTimeoutMs?: string;
 }
 
 function resolvePlatformOption(platform?: string): PlatformTarget {
@@ -128,6 +135,39 @@ function resolveCliSlideTransitions(
   return parts.join(',');
 }
 
+/**
+ * Map `--iframes <mode>` onto ConversionOptions.iframes.
+ * Accepts inspect / screenshot / skip; undefined when unset (API default).
+ */
+function resolveIframesOption(
+  mode?: string
+): ConversionOptions['iframes'] {
+  if (!mode) return undefined;
+  const lower = mode.trim().toLowerCase();
+  if (lower === 'inspect' || lower === 'screenshot' || lower === 'skip') {
+    return lower as 'inspect' | 'screenshot' | 'skip';
+  }
+  throw new Error(
+    `Invalid --iframes: ${mode}. Use inspect, screenshot, or skip.`
+  );
+}
+
+/**
+ * Parse `--iframe-load-timeout-ms <ms>` into a positive integer; undefined when unset.
+ */
+function resolveIframeLoadTimeoutMs(
+  value?: string
+): ConversionOptions['iframeLoadTimeoutMs'] {
+  if (!value) return undefined;
+  const ms = parseInt(value, 10);
+  if (Number.isNaN(ms) || ms < 1) {
+    throw new Error(
+      `Invalid --iframe-load-timeout-ms: ${value}. Use a positive integer.`
+    );
+  }
+  return ms;
+}
+
 function buildCloudParams(
   options: ConvertOptions,
   platform: CloudPlatform,
@@ -158,8 +198,12 @@ async function runLocalConvert(
   excludeSelector?: string,
   identityAttribute?: string,
   animations?: boolean,
-  slideTransitions?: ConversionOptions['slideTransitions']
+  slideTransitions?: ConversionOptions['slideTransitions'],
+  iframesMode?: string,
+  iframeLoadTimeoutMsStr?: string
 ): Promise<ConversionResultEnvelope> {
+  const iframes = resolveIframesOption(iframesMode);
+  const iframeLoadTimeoutMs = resolveIframeLoadTimeoutMs(iframeLoadTimeoutMsStr);
   const resolvedViewport =
     viewport ??
     detectViewportFromFile(inputPaths[0]!) ?? {
@@ -195,6 +239,8 @@ async function runLocalConvert(
       excludeSelector,
       identityAttribute,
       browser: executablePath ? { executablePath } : undefined,
+      iframes,
+      iframeLoadTimeoutMs,
     });
 
     const outputPaths = buildPngOutputPaths(outputPath, result.images.length);
@@ -255,6 +301,8 @@ async function runLocalConvert(
     animations,
     slideTransitions,
     browser: executablePath ? { executablePath } : undefined,
+    iframes,
+    iframeLoadTimeoutMs,
   });
 
   await atomicWriteFile(outputPath, result.data, { overwrite: force });
@@ -435,6 +483,14 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
       '--no-slide-transitions',
       'Disable slide-to-slide transition effects (p:transition)'
     )
+    .option(
+      '--iframes <mode>',
+      'How to handle iframe elements: inspect (default), screenshot, or skip. Local mode only'
+    )
+    .option(
+      '--iframe-load-timeout-ms <ms>',
+      'Timeout for loading iframe documents in a new page (default: 8000)'
+    )
     .action(async (inputs: string[], options: ConvertOptions) => {
       if (inputs.length === 0) {
         return;
@@ -507,7 +563,9 @@ export function registerConvertCommand(program: Command, ctx: Context): void {
               options.exclude,
               options.identityAttribute,
               options.animations,
-              slideTransitions
+              slideTransitions,
+              options.iframes,
+              options.iframeLoadTimeoutMs
             );
           }
 

@@ -232,6 +232,11 @@ async function processSingleInput(
         identityAttribute: options.identityAttribute,
         identityDiagnostics,
         excludedCount: excludedCounter,
+        iframes: options.iframes,
+        iframeLoadTimeoutMs: options.iframeLoadTimeoutMs,
+        allowLocalResources: options.allowLocalResources,
+        resourcePolicy: options.resourcePolicy,
+        iframeDiagnostics: identityDiagnostics,
       };
       const slideConcurrency =
         runtime?.slideInspectConcurrency ?? resolveSlideInspectConcurrency();
@@ -267,6 +272,11 @@ async function processSingleInput(
         identityAttribute: options.identityAttribute,
         identityDiagnostics,
         excludedCount: excludedCounter,
+        iframes: options.iframes,
+        iframeLoadTimeoutMs: options.iframeLoadTimeoutMs,
+        allowLocalResources: options.allowLocalResources,
+        resourcePolicy: options.resourcePolicy,
+        iframeDiagnostics: identityDiagnostics,
       });
 
       if (elements.length === 0) {
