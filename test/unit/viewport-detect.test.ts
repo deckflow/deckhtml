@@ -108,6 +108,21 @@ describe('parseFixedSlideHostSize', () => {
     });
   });
 
+  it('reads host size from <style> inside HTML', () => {
+    const html = `<!doctype html><style>.slide-container { width: 1280px; height: 720px; }</style><img src="data:image/png;base64,${'A'.repeat(200_000)}">`;
+    assert.deepEqual(parseFixedSlideHostSize(html), {
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it('does not hang on large data-URI HTML without style host rules', () => {
+    const html = `<!doctype html><body><img src="data:image/png;base64,${'A'.repeat(500_000)}"></body>`;
+    const t0 = Date.now();
+    assert.equal(parseFixedSlideHostSize(html), null);
+    assert.ok(Date.now() - t0 < 1000, 'must finish quickly on large base64 blobs');
+  });
+
   it('ignores tiny decorative boxes', () => {
     const css = `.slide { width: 10px; height: 10px; }`;
     assert.equal(parseFixedSlideHostSize(css), null);

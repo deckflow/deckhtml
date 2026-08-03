@@ -151,26 +151,58 @@ export function parseDeckCssVariables(cssOrHtml: string): ViewportSize | null {
 }
 
 /**
+ * Extract text content of `<style>` blocks from HTML.
+ * Used so CSS rule scanners never run against markup / data-URI blobs
+ * (those can be multi-MB lines without `{`/`}`, which makes `/[^{}@]+\{/` O(n²)).
+ */
+export function extractInlineStyleBlocks(html: string): string {
+  const chunks: string[] = [];
+  const styleRe = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = styleRe.exec(html)) !== null) {
+    const css = match[1];
+    if (css) chunks.push(css);
+  }
+  return chunks.join('\n');
+}
+
+/**
+ * CSS chunks safe to scan with the CSS-rule regex.
+ * Prefer `<style>` contents when present; skip HTML markup (no style tags);
+ * otherwise treat the whole string as CSS (linked stylesheets / pure CSS).
+ */
+function cssChunksForRuleScan(cssOrHtml: string): string[] {
+  const inline = extractInlineStyleBlocks(cssOrHtml);
+  if (inline) return [inline];
+  // HTML without <style> — do not scan body / base64 blobs.
+  if (/<[a-zA-Z!/?]/.test(cssOrHtml)) return [];
+  return [cssOrHtml];
+}
+
+/**
  * Read fixed `width`/`height` px on common slide host / root selectors.
+ * Scans only CSS (inline `<style>` blocks or pure stylesheet text), never raw HTML.
  */
 export function parseFixedSlideHostSize(cssOrHtml: string): ViewportSize | null {
-  // Match CSS rule blocks; keep it simple (no nested @rules required for our cases).
-  const ruleRe = /([^{}@]+)\{([^{}]+)\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = ruleRe.exec(cssOrHtml)) !== null) {
-    const selectors = match[1]!;
-    const body = match[2]!;
-    if (!SLIDE_HOST_SELECTOR_RE.test(selectors)) continue;
+  for (const css of cssChunksForRuleScan(cssOrHtml)) {
+    // Match CSS rule blocks; keep it simple (no nested @rules required for our cases).
+    const ruleRe = /([^{}@]+)\{([^{}]+)\}/g;
+    let match: RegExpExecArray | null;
+    while ((match = ruleRe.exec(css)) !== null) {
+      const selectors = match[1]!;
+      const body = match[2]!;
+      if (!SLIDE_HOST_SELECTOR_RE.test(selectors)) continue;
 
-    const widthMatch = body.match(/(?:^|[;\s])width\s*:\s*([^;}\n]+)/i);
-    const heightMatch = body.match(/(?:^|[;\s])height\s*:\s*([^;}\n]+)/i);
-    if (!widthMatch || !heightMatch) continue;
-    const width = parseCssPxLength(widthMatch[1]!);
-    const height = parseCssPxLength(heightMatch[1]!);
-    if (width == null || height == null) continue;
-    // Ignore tiny decorative boxes accidentally matching a host selector.
-    if (width < 320 || height < 180) continue;
-    return { width, height };
+      const widthMatch = body.match(/(?:^|[;\s])width\s*:\s*([^;}\n]+)/i);
+      const heightMatch = body.match(/(?:^|[;\s])height\s*:\s*([^;}\n]+)/i);
+      if (!widthMatch || !heightMatch) continue;
+      const width = parseCssPxLength(widthMatch[1]!);
+      const height = parseCssPxLength(heightMatch[1]!);
+      if (width == null || height == null) continue;
+      // Ignore tiny decorative boxes accidentally matching a host selector.
+      if (width < 320 || height < 180) continue;
+      return { width, height };
+    }
   }
   return null;
 }
@@ -241,6 +273,7 @@ function detectFromCssSources(...sources: string[]): ViewportSize | null {
  * Detect declared slide size from HTML source.
  * Order: deck-size meta → CSS size vars → viewport meta → stage JSON → fixed host px.
  * When `baseDir` is set, also reads local linked stylesheets for CSS signals.
+ * CSS detectors only see `<style>` contents + linked stylesheets (not HTML body / data URIs).
  */
 export function detectViewportFromHtml(
   html: string,
@@ -248,10 +281,11 @@ export function detectViewportFromHtml(
 ): ViewportSize | null {
   const linkedCss =
     options.baseDir != null ? readLocalStylesheets(html, options.baseDir) : '';
+  const inlineCss = extractInlineStyleBlocks(html);
 
   return (
     parseDeckSizeMeta(html) ??
-    detectFromCssSources(html, linkedCss) ??
+    detectFromCssSources(inlineCss, linkedCss) ??
     parseViewportMeta(html) ??
     parseStageJson(html)
   );
