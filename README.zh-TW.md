@@ -1,8 +1,16 @@
 # DeckHTML
 
+<p align="center">
+  <img src="./assets/preview.png" alt="DeckHTML — HTML to PPTX" width="800" />
+</p>
+
 **語言：** [English](./README.md) · [简体中文](./README.zh-CN.md) · **繁體中文** · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
 在終端機中將 HTML 檔案、標準輸入或 URL 轉換為 PPTX 或 PNG 簡報。
+
+<p align="center">
+  <img src="./assets/screenshots/demo.gif" alt="HTML → PPTX 示範" width="600" />
+</p>
 
 ## 快速開始
 

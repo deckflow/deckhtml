@@ -1,8 +1,16 @@
 # DeckHTML
 
+<p align="center">
+  <img src="./assets/preview.png" alt="DeckHTML — HTML to PPTX" width="800" />
+</p>
+
 **Sprachen:** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · **Deutsch** · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
 Konvertieren Sie HTML-Dateien, stdin oder URLs im Terminal in PPTX- oder PNG-Präsentationen.
+
+<p align="center">
+  <img src="./assets/screenshots/demo.gif" alt="HTML → PPTX Demo" width="600" />
+</p>
 
 ## Schnellstart
 

@@ -1,8 +1,16 @@
 # DeckHTML
 
+<p align="center">
+  <img src="./assets/preview.png" alt="DeckHTML — HTML to PPTX" width="800" />
+</p>
+
 **Idiomas:** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · **Español** · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
 Convierte archivos HTML, entrada estándar o URL en presentaciones PPTX o PNG desde la terminal.
+
+<p align="center">
+  <img src="./assets/screenshots/demo.gif" alt="Demo HTML → PPTX" width="600" />
+</p>
 
 ## Inicio rápido
 

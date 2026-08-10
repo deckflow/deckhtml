@@ -1,8 +1,16 @@
 # DeckHTML
 
+<p align="center">
+  <img src="./assets/preview.png" alt="DeckHTML — HTML to PPTX" width="800" />
+</p>
+
 **言語：** [English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · **日本語** · [한국어](./README.ko.md)
 
 ターミナルから HTML ファイル、標準入力、または URL を PPTX または PNG プレゼンテーションに変換します。
+
+<p align="center">
+  <img src="./assets/screenshots/demo.gif" alt="HTML → PPTX デモ" width="600" />
+</p>
 
 ## クイックスタート
 

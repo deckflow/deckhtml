@@ -4,9 +4,17 @@
 [![npm downloads](https://img.shields.io/npm/dm/@deckflow/deckhtml?logo=npm&label=downloads)](https://www.npmjs.com/package/@deckflow/deckhtml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
+<p align="center">
+  <img src="./assets/preview.png" alt="DeckHTML — HTML to PPTX" width="800" />
+</p>
+
 **Languages:** **English** · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
 Convert HTML files, stdin, or URLs into PPTX or PNG presentations from your terminal.
+
+<p align="center">
+  <img src="./assets/screenshots/demo.gif" alt="HTML → PPTX demo" width="600" />
+</p>
 
 ## Quick Start
 
