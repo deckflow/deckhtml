@@ -1,8 +1,6 @@
 .DS_Store
 dist
 node_modules
-*.pptx
 benchmark/*
 !benchmark/pending/
 *.pdf
-*.png
