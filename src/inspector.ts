@@ -34,6 +34,14 @@ export interface SlideProbeRule {
    * matches (e.g. header.hero next to section). Named slide-class rules default false.
    */
   expandSiblingHosts?: boolean;
+  /**
+   * Optional regular expression (matched against individual CSS class tokens) that
+   * a candidate must satisfy. This keeps broad fallback probes from treating
+   * incidental names such as `.slideshow` or `.slider` as slide hosts.
+   */
+  classTokenPattern?: string;
+  /** Require visible textual or media-like content before accepting a fallback host. */
+  requireMeaningfulContent?: boolean;
 }
 
 /** Metadata for slide decks gated by a mutually-exclusive CSS class (e.g. `.active`). */
@@ -115,6 +123,15 @@ export const SLIDE_PROBE_RULES: SlideProbeRule[] = [
   { label: '.slide', selector: '.slide' },
   { label: '[data-slide]', selector: '[data-slide]' },
   { label: 'section.slide', selector: 'section.slide' },
+  {
+    // Covers conventions such as .slide-deck, .slide_page, .deck-slide, and
+    // .slideDeck without matching unrelated .slideshow / .slider classes.
+    // Size qualification in the inspector remains mandatory.
+    label: 'semantic slide class',
+    selector: '[class]',
+    classTokenPattern: '^(?:slide(?:[-_][\\w-]+|[A-Z][\\w-]*)?|[\\w-]+[-_]slide)$',
+    requireMeaningfulContent: true,
+  },
   {
     label: 'section',
     selector: 'section',
@@ -391,6 +408,12 @@ export class ElementInspector {
             node.removeAttribute(candidateAttr);
           });
           let nodes = Array.from(document.querySelectorAll(probeRule.selector));
+          if (probeRule.classTokenPattern) {
+            const classTokenPattern = new RegExp(probeRule.classTokenPattern);
+            nodes = nodes.filter((node) =>
+              Array.from(node.classList).some((className) => classTokenPattern.test(className))
+            );
+          }
           if (probeRule.topLevelAncestorSelector) {
             nodes = nodes.filter(
               (node) =>
@@ -439,7 +462,16 @@ export class ElementInspector {
     const expandSiblingHosts = probeRule.expandSiblingHosts === true;
 
     return this.page.evaluate(
-      ({ candidateAttr, indexAttr, ruleLabel, minH, maxH, minW, expandSiblingHosts }) => {
+      ({
+        candidateAttr,
+        indexAttr,
+        ruleLabel,
+        minH,
+        maxH,
+        minW,
+        expandSiblingHosts,
+        requireMeaningfulContent,
+      }) => {
         const sortDocumentOrder = (a: Element, b: Element): number => {
           const pos = a.compareDocumentPosition(b);
           if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
@@ -482,7 +514,13 @@ export class ElementInspector {
         let qualified: Element[];
 
         if (!expandSiblingHosts) {
-          qualified = candidates.filter(qualifiesSize).sort(sortDocumentOrder);
+          qualified = candidates
+            .filter(
+              (candidate) =>
+                qualifiesSize(candidate) &&
+                (!requireMeaningfulContent || hasMeaningfulContent(candidate))
+            )
+            .sort(sortDocumentOrder);
         } else {
           const seenParents = new Set<Element>();
           const parents: Element[] = [];
@@ -534,6 +572,7 @@ export class ElementInspector {
         maxH,
         minW,
         expandSiblingHosts,
+        requireMeaningfulContent: probeRule.requireMeaningfulContent === true,
       }
     );
   }
