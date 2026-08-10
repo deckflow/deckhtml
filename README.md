@@ -1,5 +1,9 @@
 # DeckHTML
 
+[![npm version](https://img.shields.io/npm/v/@deckflow/deckhtml?logo=npm&label=npm)](https://www.npmjs.com/package/@deckflow/deckhtml)
+[![npm downloads](https://img.shields.io/npm/dm/@deckflow/deckhtml?logo=npm&label=downloads)](https://www.npmjs.com/package/@deckflow/deckhtml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 **Languages:** **English** · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
 Convert HTML files, stdin, or URLs into PPTX or PNG presentations from your terminal.
@@ -95,7 +99,7 @@ deckhtml index.html \
 
 ## Authentication & Config
 
-Authentication is only required for cloud execution and cloud-only flags. Local conversion works without an API key.
+Local conversion works without an API key. Cloud mode can start as a rate-limited guest; sign in or configure an API key when prompted or when you need authenticated access.
 
 ```bash
 deckhtml auth login
@@ -180,7 +184,7 @@ writeFileSync('deck.pptx', result.data);
 
 ## Documentation
 
-Detailed CLI documentation is available in the [`docs/cli/`](./docs/cli/) directory.
+Start with the [quick start](./docs/quickstart.md), then learn the [core concepts](./docs/concepts.md) and [architecture](./docs/architecture.md). Detailed CLI documentation is available in the [`docs/cli/`](./docs/cli/) directory.
 
 ## License
 

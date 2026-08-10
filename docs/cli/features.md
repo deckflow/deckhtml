@@ -58,13 +58,13 @@ For stdin, pass `--output` because there is no source filename to derive the out
 
 ## Execution Modes
 
-DeckHTML can run locally or in DeckHTML Cloud. Authentication is optional for local mode and required only for cloud execution or cloud-only enhancement flags.
+DeckHTML can run locally or in DeckHTML Cloud. Authentication is optional for local mode. Cloud mode supports rate-limited guest requests; sign in or configure an API key when prompted or when you need authenticated access.
 
 | Mode | Behavior |
 | --- | --- |
 | `auto` | Use cloud when an API key exists; otherwise use local conversion. |
 | `local` | Force local conversion. |
-| `cloud` | Force cloud conversion and require an API key. |
+| `cloud` | Force cloud conversion. Guest requests are rate-limited; sign in when prompted or for authenticated access. |
 
 ```bash
 deckhtml index.html --mode auto
@@ -82,19 +82,13 @@ The following flags are only available in cloud mode:
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `--rebuild-svg` | Rebuild SVG objects during conversion. | Off |
-| `--rebuild-chart` | Rebuild chart objects during conversion. | Off |
 | `--embed-fonts` | Embed fonts into the output. | Off |
-| `--map-motion` | Map animations into the output. | Off |
 
 ```bash
 deckhtml index.html \
   -o deck.pptx \
   --mode cloud \
-  --rebuild-svg \
-  --rebuild-chart \
   --embed-fonts \
-  --map-motion
 ```
 
 ***

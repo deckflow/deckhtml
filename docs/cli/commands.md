@@ -36,10 +36,7 @@ Convert HTML input into a presentation artifact.
 | `--report` | Generate a conversion report next to the output. | Off |
 | `--mode <mode>` | Choose `auto`, `local`, or `cloud` execution. | `auto` |
 | `--render-wait <seconds>` | Wait time per page before capture. | `3` |
-| `--rebuild-svg` | Rebuild SVG objects. Cloud only. | Off |
-| `--rebuild-chart` | Rebuild chart objects. Cloud only. | Off |
 | `--embed-fonts` | Embed fonts. Cloud only. | Off |
-| `--map-motion` | Map animations. Cloud only. | Off |
 | `--format <format>` | Choose `pptx` or `png`. | `pptx` |
 | `--webhook <url>` | Callback URL for cloud conversion events. | Config |
 | `--retention-hours <n>` | Cloud file retention time in hours. | Config |
@@ -52,20 +49,17 @@ Convert HTML input into a presentation artifact.
 | --- | --- |
 | `auto` | If an API key is configured, run in cloud mode. If not, run locally. |
 | `local` | Always run locally. Cloud-only flags are invalid. |
-| `cloud` | Run in cloud mode and require an API key. |
+| `cloud` | Run in cloud mode. Guest requests are rate-limited; sign in when prompted or for authenticated access. |
 
 Cloud-only flags are:
 
 | Flag | Description |
 | --- | --- |
-| `--rebuild-svg` | Rebuild SVG objects. |
-| `--rebuild-chart` | Rebuild chart objects. |
 | `--embed-fonts` | Embed fonts. |
-| `--map-motion` | Map animations. |
 
 ## Authentication
 
-Authentication is only required for cloud execution and cloud-only enhancement flags. Local conversion works without an API key.
+Local conversion works without an API key. Cloud mode can start as a rate-limited guest; sign in or configure an API key when prompted or when you need authenticated access.
 
 | Command | Description |
 | --- | --- |

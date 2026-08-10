@@ -115,15 +115,12 @@ Use cloud mode for cloud-only reconstruction features:
 deckhtml index.html \
   -o deck.pptx \
   --mode cloud \
-  --rebuild-svg \
-  --rebuild-chart \
   --embed-fonts \
-  --map-motion
 ```
 
 ## 5. Authenticate
 
-Authentication is only required for cloud execution and cloud-only enhancement flags.
+Local conversion works without an API key. Cloud mode supports rate-limited guest requests; sign in or configure an API key when prompted or when you need authenticated access.
 
 Start an interactive login flow:
 

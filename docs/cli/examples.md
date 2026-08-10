@@ -133,10 +133,7 @@ Rebuild richer presentation objects in cloud mode:
 deckhtml index.html \
   -o deck.pptx \
   --mode cloud \
-  --rebuild-svg \
-  --rebuild-chart \
   --embed-fonts \
-  --map-motion
 ```
 
 These flags are cloud-only.
