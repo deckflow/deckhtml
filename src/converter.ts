@@ -12,6 +12,7 @@ import {
   pxToPoints,
   getSlideWidthPx,
   getSlideHeightPx,
+  clampPptxTablePositionInch,
 } from './utils/coordinate';
 import {
   getTextOptions,
@@ -1176,7 +1177,13 @@ export class ElementConverter {
       })
     );
 
-    const opts: any = { ...baseProps, rows };
+    const opts: any = {
+      ...baseProps,
+      // pptxgenjs addTable corrupts any negative x/y (multi-pass inch→EMU).
+      x: clampPptxTablePositionInch(baseProps.x),
+      y: clampPptxTablePositionInch(baseProps.y),
+      rows,
+    };
 
     // Pass column widths and row heights for compact layout (in inches)
     if (element.tableData.colW?.length) {

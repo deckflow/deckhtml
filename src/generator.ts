@@ -6,7 +6,7 @@
 import PptxGenJS from 'pptxgenjs';
 import { ElementAnimation, ElementInfo, SlideAnimationSpec, UsedFontDescriptor } from './types';
 import { ElementConverter } from './converter';
-import { SLIDE_WIDTH_INCH, SLIDE_HEIGHT_INCH, getSlideHeightPx } from './utils/coordinate';
+import { SLIDE_WIDTH_INCH, SLIDE_HEIGHT_INCH, getSlideHeightPx, clampPptxTablePositionInch } from './utils/coordinate';
 import { PlatformFontContext } from './utils/platformFontMap';
 import { StyleEnhancementRegistry } from './enhancer/registry';
 import { applyStyleEnhancements } from './enhancer/processor';
@@ -714,18 +714,12 @@ export class PPTXGenerator {
 
       case 'table': {
         const { rows, x, y, w, h, colW, rowH, margin } = converted.options;
-        const tableOpts: any = { x, y, w, h };
-        if (colW?.length) tableOpts.colW = colW;
-        if (rowH?.length) tableOpts.rowH = rowH;
-        if (margin !== undefined) tableOpts.margin = margin;
-        else tableOpts.margin = 0;
-        slide.addTable(rows, tableOpts);
-        break;
-      }
-
-      case 'table': {
-        const { rows, x, y, w, h, colW, rowH, margin } = converted.options;
-        const tableOpts: any = { x, y, w, h };
+        const tableOpts: any = {
+          x: clampPptxTablePositionInch(x),
+          y: clampPptxTablePositionInch(y),
+          w,
+          h,
+        };
         if (colW?.length) tableOpts.colW = colW;
         if (rowH?.length) tableOpts.rowH = rowH;
         if (margin !== undefined) tableOpts.margin = margin;

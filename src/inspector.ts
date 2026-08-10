@@ -1171,6 +1171,17 @@ export class ElementInspector {
         }
 
         host.scrollIntoView({ block: 'start', inline: 'nearest' });
+        // scrollIntoView can shift the viewport (esp. when content overflows).
+        // Inspect uses getBoundingClientRect() (viewport space); a non-zero
+        // scrollX makes every x look ~scrollX too small — even slightly
+        // negative — which then blows up in pptxgenjs addTable. Always reset.
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.documentElement.scrollLeft = 0;
+        if (document.body) {
+          document.body.scrollTop = 0;
+          document.body.scrollLeft = 0;
+        }
         const nodes = [
           host,
           ...Array.from(host.querySelectorAll('.reveal')),
@@ -1638,8 +1649,21 @@ export class ElementInspector {
     // Single-page path: capture CSS animation declarations before inspection.
     // (Multi-slide paths capture per slide inside isolateOutsideSlideContainer.)
     await this.captureCssAnimations(slideSelector);
+    // Guaranteed origin before measuring — scrollIntoView / focus may have moved it.
+    await this.page.evaluate(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.documentElement.scrollLeft = 0;
+      if (document.body) {
+        document.body.scrollTop = 0;
+        document.body.scrollLeft = 0;
+      }
+    });
     const elements = await this.page.evaluate(
       async ({ slideSelector, slideHeight, inputIsSvg, excludeSelector, slideIdAttribute, identityAttribute }) => {
+        // Re-assert inside the measure world (defensive against late layout scroll).
+        window.scrollTo(0, 0);
+
         const result: any[] = [];
         const _debugInfo: string[] = [];
         const _excludedCount = { value: 0 };
@@ -1652,6 +1676,36 @@ export class ElementInspector {
         // not give the carrying element a data-element-id). Stamped as
         // data-dh-anim-gid so descendants can inherit via closest().
         let _animRootCounter = 0;
+
+        /** Document-space box from a viewport rect (scroll-safe). */
+        function docBox(rect: DOMRect | DOMRectReadOnly): DOMRect {
+          const left = rect.left + window.scrollX;
+          const top = rect.top + window.scrollY;
+          const width = rect.width;
+          const height = rect.height;
+          return {
+            x: left,
+            y: top,
+            left,
+            top,
+            width,
+            height,
+            right: left + width,
+            bottom: top + height,
+            toJSON() {
+              return {
+                x: left,
+                y: top,
+                left,
+                top,
+                width,
+                height,
+                right: left + width,
+                bottom: top + height,
+              };
+            },
+          } as DOMRect;
+        }
 
         /** Read a stable caller-declared identity from an element (DH-P0-001). */
         function readElementIdentity(element: Element): string | undefined {
@@ -5325,7 +5379,7 @@ export class ElementInspector {
           // Skip if not visible
           if (!isVisible(element)) return;
 
-          const rect = element.getBoundingClientRect();
+          const rect = docBox(element.getBoundingClientRect());
           const type = getElementType(element);
 
           // Debug: background fill vs background image layering
@@ -5796,17 +5850,17 @@ export class ElementInspector {
                 !hasTransformRotation(element);
 
               if (shouldSplitCaptionFrame) {
-                textRect = rangeRect;
+                textRect = docBox(rangeRect);
                 emitSplitCaptionFrameShape = true;
               } else if (shouldShrinkToTextRange) {
-                textRect = rangeRect;
+                textRect = docBox(rangeRect);
               } else if (
                 element instanceof HTMLElement &&
                 (hasExcludedTextSubtrees || hasDecorativeChildren || hasInFlowPseudoBefore)
               ) {
                 // Full border-box kept for background/border; PPT margin only encodes padding+border,
                 // not in-flow icons/SVG/gap — shift text by measured first-line left edge.
-                const tr = rangeRect;
+                const tr = docBox(rangeRect);
                 const bl = parseFloat(style.borderLeftWidth) || 0;
                 const pl = parseFloat(style.paddingLeft) || 0;
                 const extraPx = tr.left - rect.left - bl - pl;

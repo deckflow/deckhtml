@@ -100,3 +100,21 @@ export function pxToPoints(px: number): number {
 export function inchToPoints(inch: number): number {
   return inch * 72;
 }
+
+/**
+ * Sanitize a table position (inches) before passing it to pptxgenjs `addTable`.
+ *
+ * pptxgenjs treats any number `< 100` as inches, converts to EMU, then in
+ * `addTable` re-runs `inch2Emu` when the result is still `< 20` — which is
+ * true for every negative EMU. A later XML write calls `getSmartParseNumber`
+ * again, so even a ~1px-negative table x explodes past OOXML
+ * `ST_Coordinate` MinInclusive and PowerPoint reports the file as corrupt.
+ *
+ * Non-finite values become 0. Tiny negative leftovers (subpixel / transform
+ * AABB) snap to 0 — visually negligible. Large negatives should not occur
+ * once inspect uses document-space coords with scroll reset to origin.
+ */
+export function clampPptxTablePositionInch(inch: number): number {
+  if (!Number.isFinite(inch)) return 0;
+  return Math.max(0, inch);
+}
