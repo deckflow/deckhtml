@@ -1184,6 +1184,52 @@ export class ElementInspector {
           }
         }
 
+        /**
+         * Freeze captured animations to their end-state before inspect.
+         *
+         * Phase B's transition probe injects `animation: none !important` on `*`,
+         * which clears fill-mode(forwards) and snaps entrance classes like
+         * `.animate-fade-up { opacity: 0; animation: … forwards }` back to opacity 0.
+         * Removing the probe stylesheet restarts those animations from the first
+         * frame. Single-slide inspectElements then measures immediately — so the
+         * whole card subtree is treated as invisible and the PPTX looks blank.
+         * Pin last-frame opacity/transform + disable animation/transition so
+         * inspect sees the final visual (PPTX entrance timing still uses `captured`).
+         */
+        const motionToTransform = (frame: MotionFrame): string => {
+          const parts: string[] = [];
+          if (frame.translateXPx || frame.translateYPx) {
+            parts.push(`translate(${frame.translateXPx}px, ${frame.translateYPx}px)`);
+          }
+          if (frame.scaleX !== 1 || frame.scaleY !== 1) {
+            parts.push(`scale(${frame.scaleX}, ${frame.scaleY})`);
+          }
+          if (frame.rotateDeg) {
+            parts.push(`rotate(${frame.rotateDeg}deg)`);
+          }
+          return parts.length > 0 ? parts.join(' ') : 'none';
+        };
+
+        for (const el of elements) {
+          if (!(el instanceof HTMLElement || el instanceof SVGElement)) continue;
+          const key = el.getAttribute(MARK_ATTR);
+          if (!key) continue;
+          const raw = captured[key] as
+            | {
+                last?: MotionFrame;
+              }
+            | undefined;
+          const last = raw?.last;
+          if (!last) continue;
+          if (last.opacity !== null && Number.isFinite(last.opacity)) {
+            el.style.setProperty('opacity', String(last.opacity), 'important');
+          }
+          el.style.setProperty('transform', motionToTransform(last), 'important');
+          el.style.setProperty('animation', 'none', 'important');
+          el.style.setProperty('transition', 'none', 'important');
+          el.style.setProperty('visibility', 'visible', 'important');
+        }
+
         (window as any)[WIN_KEY] = captured;
       }, slideSelector ?? null)
       .catch(() => {});
