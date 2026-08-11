@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>声明式动画 · 时长/延迟时间语法 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #2563eb; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #2563eb; }
+  .card { position: absolute; top: 236px; width: 280px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 18px 20px; }
+  .fx { font-size: 20px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 10px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #2563eb; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #2563eb; background: #eff6ff; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-007">
+  <div class="header">
+    <div class="hrow"><span class="cat">声明式 · data-animation</span><span class="idx">07 / 19</span></div>
+    <h1>时长 / 延迟的时间语法</h1>
+    <p class="expect">预期 PPTX：<b>"800" / "800ms" / "0.8s"</b> 三种写法都解析为 <b>0.8s</b>；第四个元素带 <b>0.5s 延迟</b>（delay）</p>
+  </div>
+
+  <div class="card" style="left: 32px;" data-element-id="decl-dur-number"
+       data-animation="fade-in" data-animation-duration="800" data-animation-trigger="click">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="fx">纯数字（ms）</div>
+      <div class="code">data-animation-duration="800"</div>
+      <div class="ppt">PPTX：<b>Fade · 0.8s</b></div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 344px;" data-element-id="decl-dur-ms"
+       data-animation="fade-in" data-animation-duration="800ms" data-animation-trigger="click">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="fx">毫秒单位</div>
+      <div class="code">data-animation-duration="800ms"</div>
+      <div class="ppt">PPTX：<b>Fade · 0.8s</b></div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 656px;" data-element-id="decl-dur-s"
+       data-animation="fade-in" data-animation-duration="0.8s" data-animation-trigger="click">
+    <div class="bar" style="background: #ea580c;"></div>
+    <div class="cbody">
+      <div class="fx">秒单位</div>
+      <div class="code">data-animation-duration="0.8s"</div>
+      <div class="ppt">PPTX：<b>Fade · 0.8s</b></div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 968px;" data-element-id="decl-delay"
+       data-animation="fly-in-left" data-animation-duration="600" data-animation-delay="0.5s" data-animation-trigger="click">
+    <div class="bar" style="background: #7c3aed;"></div>
+    <div class="cbody">
+      <div class="fx">带延迟</div>
+      <div class="code">data-animation-duration="600"<br>data-animation-delay="0.5s"</div>
+      <div class="ppt">PPTX：<b>Fly In · 0.6s</b>，延迟 <b>0.5s</b></div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>前三个动画的持续时间应完全相同（均为 0.8s，三种时间写法等价）；第四个动画单击后停顿 0.5s 再播放 0.6s 的 Fly In（动画窗格「延迟」列 = 0.5）。</div>
+</div>
+<script src="vendor/preview-declared.js"></script>
+</body>
+</html>

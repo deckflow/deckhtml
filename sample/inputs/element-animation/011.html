@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>CSS 动画 · 淡入+位移并行组合 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #0d9488; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #0d9488; }
+  .card { position: absolute; top: 236px; width: 520px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 20px 24px; }
+  .fx { font-size: 24px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 12px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #0d9488; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #0d9488; background: #f0fdfa; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+
+  /* —— 被自动推断的 CSS 动画（透明度 + 单轴位移 => Fade 与 Fly 并行） —— */
+  @keyframes cssFadeFlyX {
+    from { opacity: 0; transform: translateX(-240px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes cssFadeFlyY {
+    from { opacity: 0; transform: translateY(180px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .anim-ff-x { animation: cssFadeFlyX 0.8s ease-out both; }
+  .anim-ff-y { animation: cssFadeFlyY 0.8s ease-out both; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-011">
+  <div class="header">
+    <div class="hrow"><span class="cat">CSS @keyframes 自动推断</span><span class="idx">11 / 19</span></div>
+    <h1>opacity + 单轴位移 ⇒ Fade 与 Fly 并行</h1>
+    <p class="expect">预期 PPTX：每个元素拆为 <b>Fade + Fly In 两个并行效果</b>（同时播放）；左卡 Fade + 自左飞入，右卡 Fade + 自下飞入</p>
+  </div>
+
+  <div class="card anim-ff-x" style="left: 96px;" data-element-id="css-fade-fly-x">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="fx">opacity 0→1 + translateX</div>
+      <div class="code">from { opacity: 0; transform: translateX(-240px); }<br>to&nbsp;&nbsp; { opacity: 1; transform: translateX(0); }</div>
+      <div class="ppt">PPTX：<b>Fade</b> 与 <b>Fly In · From Left</b> 并行，各 0.8s</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card anim-ff-y" style="left: 664px;" data-element-id="css-fade-fly-y">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="fx">opacity 0→1 + translateY</div>
+      <div class="code">from { opacity: 0; transform: translateY(180px); }<br>to&nbsp;&nbsp; { opacity: 1; transform: translateY(0); }</div>
+      <div class="ppt">PPTX：<b>Fade</b> 与 <b>Fly In · From Bottom</b> 并行，各 0.8s</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>动画窗格中每个元素对应两条计时相同的效果（Fade + Fly In），播放时表现为「边淡入边滑入」；这是规范化子集允许的唯一并行组合（fade + 单轴位移）。</div>
+</div>
+</body>
+</html>

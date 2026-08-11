@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>声明式动画 · Fly 短别名 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #2563eb; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #2563eb; }
+  .card { position: absolute; top: 236px; width: 280px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 18px 20px; }
+  .arrow { font-size: 30px; line-height: 1; color: #2563eb; }
+  .fx { margin-top: 8px; font-size: 20px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 10px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #2563eb; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #2563eb; background: #eff6ff; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-019">
+  <div class="header">
+    <div class="hrow"><span class="cat">声明式 · data-animation</span><span class="idx">19 / 19</span></div>
+    <h1>Fly 短别名（fly-left 等）</h1>
+    <p class="expect">预期 PPTX：与 <b>fly-in-*</b> 完全等价的 4 个 <b>Fly In</b>；短别名 <b>fly-left / fly-right / fly-top / fly-bottom</b> 均应归一到对应方向</p>
+  </div>
+
+  <div class="card" style="left: 32px;" data-element-id="decl-fly-alias-left"
+       data-animation="fly-left" data-animation-duration="700" data-animation-trigger="click">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="arrow">→</div>
+      <div class="fx">fly-left</div>
+      <div class="code">data-animation="fly-left"</div>
+      <div class="ppt">PPTX：<b>Fly In · From Left</b><br>（≡ fly-in-left）</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 344px;" data-element-id="decl-fly-alias-right"
+       data-animation="fly-right" data-animation-duration="700" data-animation-trigger="click">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="arrow">←</div>
+      <div class="fx">fly-right</div>
+      <div class="code">data-animation="fly-right"</div>
+      <div class="ppt">PPTX：<b>Fly In · From Right</b><br>（≡ fly-in-right）</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 656px;" data-element-id="decl-fly-alias-top"
+       data-animation="fly-top" data-animation-duration="700" data-animation-trigger="click">
+    <div class="bar" style="background: #7c3aed;"></div>
+    <div class="cbody">
+      <div class="arrow">↓</div>
+      <div class="fx">fly-top</div>
+      <div class="code">data-animation="fly-top"</div>
+      <div class="ppt">PPTX：<b>Fly In · From Top</b><br>（≡ fly-in-top）</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 968px;" data-element-id="decl-fly-alias-bottom"
+       data-animation="fly-bottom" data-animation-duration="700" data-animation-trigger="click">
+    <div class="bar" style="background: #ea580c;"></div>
+    <div class="cbody">
+      <div class="arrow">↑</div>
+      <div class="fx">fly-bottom</div>
+      <div class="code">data-animation="fly-bottom"</div>
+      <div class="ppt">PPTX：<b>Fly In · From Bottom</b><br>（≡ fly-in-bottom）</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>与第 02 页对比，动画窗格效果应一致（均为 Fly In 四方向）；确认短别名不会被当成 unknown effect 产生 UNMAPPED 警告。</div>
+</div>
+<script src="vendor/preview-declared.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>边界 · 声明式未支持效果（降级） · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #dc2626; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #dc2626; }
+  .card { position: absolute; top: 236px; width: 520px; height: 252px; background: #fff; border: 1px solid #fecaca; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 20px 24px; }
+  .fx { font-size: 24px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #fef2f2; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 12px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #dc2626; }
+  .warn { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-016">
+  <div class="header">
+    <div class="hrow"><span class="cat">边界 · 降级路径（预期 UNMAPPED）</span><span class="idx">16 / 19</span></div>
+    <h1>声明式：退出动画与未知效果名</h1>
+    <p class="expect">预期：两个元素均<b>不产生 PPTX 动画</b>，保持<b>静态终态</b>；诊断 / --report 中出现 2 条 <b>DECKHTML_ANIMATION_UNMAPPED</b> 警告</p>
+  </div>
+
+  <div class="card" style="left: 96px;" data-element-id="unmapped-exit"
+       data-animation="fade-out" data-animation-trigger="click">
+    <div class="bar" style="background: #dc2626;"></div>
+    <div class="cbody">
+      <div class="fx">fade-out（退出动画）</div>
+      <div class="code">data-animation="fade-out"</div>
+      <div class="ppt">警告原因：<b>exit animations are not supported yet</b><br>元素静态显示（可见终态）</div>
+      <span class="warn">预期 UNMAPPED 警告</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 664px;" data-element-id="unmapped-unknown"
+       data-animation="bounce" data-animation-trigger="click">
+    <div class="bar" style="background: #f59e0b;"></div>
+    <div class="cbody">
+      <div class="fx">bounce（未知名称）</div>
+      <div class="code">data-animation="bounce"</div>
+      <div class="ppt">警告原因：<b>unknown effect "bounce"</b><br>元素静态显示（可见终态）</div>
+      <span class="warn">预期 UNMAPPED 警告</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>转换不中断（非 strict 模式仅警告）；动画窗格中本页<b>无动画</b>；两元素在幻灯片上静态可见；报告中 2 条警告且 recovery 建议使用受支持的进入效果名。strict 模式下默认会硬性失败（可用 strict.allowUnmappedAnimations 放宽）。</div>
+</div>
+</body>
+</html>

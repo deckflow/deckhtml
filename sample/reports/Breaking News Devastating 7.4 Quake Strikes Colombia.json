@@ -1,0 +1,598 @@
+{
+  "schema_version": 1,
+  "engine": {
+    "name": "@deckflow/deckhtml",
+    "version": "0.6.1"
+  },
+  "status": "succeeded",
+  "slides": [
+    {
+      "slide_id": "slide-01",
+      "index": 1,
+      "elements": [
+        {
+          "element_id": null,
+          "kind": "canvas",
+          "mapping_mode": "raster",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.5,
+            "y": 0.0625,
+            "w": 5.5,
+            "h": 5.5625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.9375,
+            "y": 0.5625,
+            "w": 1.40869140625,
+            "h": 1.0390625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.9375,
+            "y": 0.5625,
+            "w": 1.40869140625,
+            "h": 1.0390625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 0.7578125,
+            "w": 1.08056640625,
+            "h": 0.4375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 1.2578125,
+            "w": 1.08056640625,
+            "h": 0.125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 6.53369140625,
+            "y": 0.5625,
+            "w": 1.40869140625,
+            "h": 1.0390625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 6.53369140625,
+            "y": 0.5625,
+            "w": 1.40869140625,
+            "h": 1.0390625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 6.69775390625,
+            "y": 0.7578125,
+            "w": 1.08056640625,
+            "h": 0.4375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 6.69775390625,
+            "y": 1.2578125,
+            "w": 1.08056640625,
+            "h": 0.125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.1298828125,
+            "y": 0.5625,
+            "w": 1.4326171875,
+            "h": 1.0390625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.1298828125,
+            "y": 0.5625,
+            "w": 1.4326171875,
+            "h": 1.0390625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.2939453125,
+            "y": 0.7578125,
+            "w": 1.1044921875,
+            "h": 0.4375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.2939453125,
+            "y": 1.2578125,
+            "w": 1.1044921875,
+            "h": 0.125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.9375,
+            "y": 1.9765625,
+            "w": 4.625,
+            "h": 1.1015625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 2.140625,
+            "w": 0.375,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 2.140625,
+            "w": 0.375,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.6328125,
+            "y": 2.140625,
+            "w": 3.765625,
+            "h": 0.1640625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.6328125,
+            "y": 2.3515625,
+            "w": 3.765625,
+            "h": 0.5625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.9375,
+            "y": 3.265625,
+            "w": 4.625,
+            "h": 1.1015625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 3.4296875,
+            "w": 0.375,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 3.4296875,
+            "w": 0.375,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.6328125,
+            "y": 3.4296875,
+            "w": 3.765625,
+            "h": 0.1640625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.6328125,
+            "y": 3.640625,
+            "w": 3.765625,
+            "h": 0.5625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.9375,
+            "y": 4.5546875,
+            "w": 4.625,
+            "h": 0.9140625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 4.71875,
+            "w": 0.375,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.1015625,
+            "y": 4.71875,
+            "w": 0.375,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.6328125,
+            "y": 4.71875,
+            "w": 3.765625,
+            "h": 0.1640625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.6328125,
+            "y": 4.9296875,
+            "w": 3.765625,
+            "h": 0.375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0.0625,
+            "w": 4.5,
+            "h": 5.5625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "canvas",
+          "mapping_mode": "raster",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0.0625,
+            "w": 4.5,
+            "h": 5.5625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.375,
+            "y": 0.5625,
+            "w": 1.5057373046875,
+            "h": 0.2578125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.375,
+            "y": 0.5625,
+            "w": 1.5057373046875,
+            "h": 0.2578125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.375,
+            "y": 1.0390625,
+            "w": 3.75,
+            "h": 1.29345703125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.375,
+            "y": 2.52001953125,
+            "w": 3.75,
+            "h": 0.75,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.375,
+            "y": 3.62353515625,
+            "w": 3.75,
+            "h": 1.50146484375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.375,
+            "y": 3.62353515625,
+            "w": 3.75,
+            "h": 1.50146484375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.65625,
+            "y": 3.81103515625,
+            "w": 3.21875,
+            "h": 0.89990234375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.65625,
+            "y": 4.8046875,
+            "w": 3.21875,
+            "h": 0.1328125,
+            "unit": "inch"
+          },
+          "warnings": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "native": 39,
+    "vector": 0,
+    "raster": 2,
+    "ignored": 0,
+    "unsupported": 0
+  },
+  "diagnostics": []
+}

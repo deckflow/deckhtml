@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>CSS 动画 · 缩放推断 Zoom / 旋转推断 Spin · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #0d9488; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #0d9488; }
+  .card { position: absolute; top: 236px; width: 520px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 20px 24px; }
+  .fx { font-size: 24px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 12px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #0d9488; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #0d9488; background: #f0fdfa; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+
+  /* —— 被自动推断的 CSS 动画 —— */
+  @keyframes cssZoom {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+  }
+  @keyframes cssSpin {
+    from { transform: rotate(-180deg); }
+    to   { transform: rotate(0deg); }
+  }
+  .anim-zoom { animation: cssZoom 0.6s ease-out both; }
+  .anim-spin { animation: cssSpin 0.9s linear both; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-010">
+  <div class="header">
+    <div class="hrow"><span class="cat">CSS @keyframes 自动推断</span><span class="idx">10 / 19</span></div>
+    <h1>scale → Zoom，rotate → Spin</h1>
+    <p class="expect">预期 PPTX：左侧 <b>Zoom</b>（0.6s，对象中心）；右侧 <b>Spin 180°</b>（0.9s，强调类，角度 = 首末帧旋转差）</p>
+  </div>
+
+  <div class="card anim-zoom" style="left: 96px;" data-element-id="css-zoom">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="fx">scale(0) → scale(1)</div>
+      <div class="code">@keyframes cssZoom {<br>&nbsp;&nbsp;from { transform: scale(0); }<br>&nbsp;&nbsp;to&nbsp;&nbsp; { transform: scale(1); }<br>}</div>
+      <div class="ppt">PPTX：<b>Zoom · 0.6s</b>（进入类，对象中心）</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card anim-spin" style="left: 664px;" data-element-id="css-spin">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="fx">rotate(-180°) → 0°</div>
+      <div class="code">@keyframes cssSpin {<br>&nbsp;&nbsp;from { transform: rotate(-180deg); }<br>&nbsp;&nbsp;to&nbsp;&nbsp; { transform: rotate(0deg); }<br>}</div>
+      <div class="ppt">PPTX：<b>Spin 180° · 0.9s</b>（强调类，顺时针）</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>Zoom 为进入动画（元素先隐藏再放大出现）；Spin 为强调动画（元素可见，原地旋转 180°）；旋转角度取首末帧 rotate 差值并保留方向符号。</div>
+</div>
+</body>
+</html>

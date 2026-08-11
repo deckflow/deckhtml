@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>综合演示 · 真实幻灯片混合动画 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #10243a; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(135deg, #10243a 0%, #16355c 100%); }
+  .hrow { position: absolute; left: 90px; top: 48px; right: 90px; display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #10243a; background: #ffb020; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #9fb3c8; font-weight: 600; }
+  .title { position: absolute; left: 90px; top: 104px; margin: 0; color: #ffffff; font-size: 52px; font-weight: 800; }
+  .subtitle { position: absolute; left: 90px; top: 182px; color: #9fb3c8; font-size: 18px; }
+  .card { position: absolute; left: 90px; top: 280px; width: 500px; height: 190px; background: #2f7cf6; border-radius: 16px; color: #fff; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+  .card .inner { padding: 26px 30px; }
+  .card .fx { font-size: 28px; font-weight: 800; }
+  .card .desc { margin-top: 10px; font-size: 16px; color: #dbeafe; line-height: 1.6; }
+  .badge { position: absolute; left: 680px; top: 300px; width: 240px; height: 110px; background: #ffb020; border-radius: 55px; color: #10243a; font-size: 24px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+  .footnote { position: absolute; left: 90px; top: 560px; color: #9fb3c8; font-size: 20px; }
+  .expect-bar { position: absolute; left: 90px; right: 90px; bottom: 30px; padding: 12px 16px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-left: 4px solid #ffb020; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #cbd5e1; }
+  .expect-bar b { color: #ffffff; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-015">
+  <div class="hrow"><span class="cat">综合演示</span><span class="idx">15 / 19</span></div>
+
+  <h1 class="title" data-element-id="deck-title"
+      data-animation="fade-in" data-animation-duration="600" data-animation-trigger="click">季度业务回顾</h1>
+  <p class="subtitle">真实排版 + 混合触发：标题 click 淡入 → 卡片 with 同播 → 徽章 after 接上 → 脚注 click 旋转</p>
+
+  <div class="card" data-element-id="deck-card"
+       data-animation="fly-in-left" data-animation-duration="800" data-animation-trigger="with">
+    <div class="inner">
+      <div class="fx">营收增长 27%</div>
+      <div class="desc">华东、华南两大区域贡献主要增量；本卡片与标题「同时」播放（fly-in-left · with）</div>
+    </div>
+  </div>
+
+  <div class="badge" data-element-id="deck-badge"
+       data-animation="zoom-in" data-animation-duration="500" data-animation-trigger="after">TOP 1 产品</div>
+
+  <p class="footnote" data-element-id="deck-footnote"
+     data-animation="spin-half" data-animation-trigger="click">数据口径：2026 H1 · 财务部（脚注：spin-half · click）</p>
+
+  <div class="expect-bar"><b>验收要点：</b>放映时 —— 单击 1：标题 Fade 与卡片 Fly In 同时播放；随后徽章自动 Zoom；单击 2：脚注 Spin 180°。动画窗格共 4 条效果，触发方式依次为 click / with / after / click。</div>
+</div>
+<script src="vendor/preview-declared.js"></script>
+</body>
+</html>

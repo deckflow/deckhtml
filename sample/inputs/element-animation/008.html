@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>CSS 动画 · 淡入推断 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #0d9488; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #0d9488; }
+  .card { position: absolute; top: 236px; width: 520px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 20px 24px; }
+  .fx { font-size: 24px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 12px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #0d9488; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #0d9488; background: #f0fdfa; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+
+  /* —— 被自动推断的 CSS 动画 —— */
+  @keyframes cssFade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .anim-fade  { animation: cssFade 0.7s ease-out both; }
+  .anim-fade-d { animation: cssFade 0.7s ease-out 0.3s both; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-008">
+  <div class="header">
+    <div class="hrow"><span class="cat">CSS @keyframes 自动推断</span><span class="idx">08 / 19</span></div>
+    <h1>opacity: 0 → 1 推断为 Fade</h1>
+    <p class="expect">预期 PPTX：2 个 <b>Fade</b> 淡入（各 0.7s）；第二个带 <b>0.3s 延迟</b>；CSS 捕获的动画默认 <b>afterPrevious</b>，按 DOM 顺序自动连播</p>
+  </div>
+
+  <div class="card anim-fade" style="left: 96px;" data-element-id="css-fade">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="fx">CSS 淡入</div>
+      <div class="code">@keyframes cssFade {<br>&nbsp;&nbsp;from { opacity: 0; }<br>&nbsp;&nbsp;to&nbsp;&nbsp; { opacity: 1; }<br>}<br>animation: cssFade 0.7s both;</div>
+      <div class="ppt">PPTX：<b>Fade · 0.7s</b>（无需任何 data 属性）</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card anim-fade-d" style="left: 664px;" data-element-id="css-fade-delay">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="fx">CSS 淡入 · 带延迟</div>
+      <div class="code">animation: cssFade 0.7s ease-out 0.3s both;<br>（animation-delay: 0.3s）</div>
+      <div class="ppt">PPTX：<b>Fade · 0.7s</b>，延迟 <b>0.3s</b></div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>进入放映后两个 Fade 依 DOM 顺序自动连播（先左后右，右侧延迟 0.3s）；动画窗格中效果名 Fade、计时「上一动画之后」；缓动曲线被丢弃（PPTX 线性），属预期行为。</div>
+</div>
+</body>
+</html>

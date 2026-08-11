@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>anime.js · 旋转推断 Spin / timeline 序列 · DeckHTML 验收</title>
+<script src="vendor/anime.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #7c3aed; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #7c3aed; }
+  .card { position: absolute; top: 236px; width: 352px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 18px 20px; }
+  .fx { font-size: 20px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 12px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #7c3aed; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #7c3aed; background: #f5f3ff; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #7c3aed; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-013">
+  <div class="header">
+    <div class="hrow"><span class="cat">anime.js 全局调用拦截</span><span class="idx">13 / 19</span></div>
+    <h1>rotate 推断 Spin 与 timeline().add() 序列</h1>
+    <p class="expect">预期 PPTX：① <b>Fade + Spin 90°</b>（0.7s）；timeline 两次 add 各记录一次 —— ② <b>Fly In · From Left</b>（0.6s）③ <b>Zoom</b>（0.6s），依次连播</p>
+  </div>
+
+  <div class="card" style="left: 56px;" id="an-note" data-element-id="anime-spin">
+    <div class="bar" style="background: #7c3aed;"></div>
+    <div class="cbody">
+      <div class="fx">① rotate[-90,0]</div>
+      <div class="code">anime({ targets: '#an-note',<br>&nbsp;&nbsp;rotate: [-90, 0], opacity: [0, 1],<br>&nbsp;&nbsp;duration: 700 });</div>
+      <div class="ppt">PPTX：<b>Fade</b> + <b>Spin 90°</b>（角度 = 差值）</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 464px;" id="tl-a" data-element-id="anime-tl-fly">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="fx">② timeline.add</div>
+      <div class="code">anime.timeline()<br>&nbsp;&nbsp;.add({ targets: '#tl-a',<br>&nbsp;&nbsp;translateX: [-200, 0], duration: 600 })</div>
+      <div class="ppt">PPTX：<b>Fly In · From Left · 0.6s</b></div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 872px;" id="tl-b" data-element-id="anime-tl-zoom">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="fx">③ timeline.add</div>
+      <div class="code">&nbsp;&nbsp;.add({ targets: '#tl-b',<br>&nbsp;&nbsp;scale: [0, 1], duration: 600 });</div>
+      <div class="ppt">PPTX：<b>Zoom · 0.6s</b>（对象中心）</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>timeline 的每次 .add() 视为一次独立调用记录（不展开时间轴偏移）；动画窗格中三条效果按调用顺序连播 —— Fade+Spin → Fly In → Zoom。</div>
+</div>
+<script>
+  anime({
+    targets: '#an-note',
+    rotate: [-90, 0],
+    opacity: [0, 1],
+    duration: 700
+  });
+  anime.timeline()
+    .add({ targets: '#tl-a', translateX: [-200, 0], duration: 600 })
+    .add({ targets: '#tl-b', scale: [0, 1], duration: 600 });
+</script>
+</body>
+</html>

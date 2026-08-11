@@ -1,0 +1,1033 @@
+{
+  "schema_version": 1,
+  "engine": {
+    "name": "@deckflow/deckhtml",
+    "version": "0.6.1"
+  },
+  "status": "succeeded",
+  "slides": [
+    {
+      "slide_id": "slide-01",
+      "index": 1,
+      "elements": [
+        {
+          "element_id": null,
+          "kind": "canvas",
+          "mapping_mode": "raster",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 5.8125,
+            "y": -0.5625,
+            "w": 4.6875,
+            "h": 4.6875,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 6.15869140625,
+            "y": 1.0546875,
+            "w": 3.515625,
+            "h": 3.515625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.21337890625,
+            "y": 0.8984375,
+            "w": 0.09375,
+            "h": 0.09375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.52587890625,
+            "y": 0.8984375,
+            "w": 0.09375,
+            "h": 0.09375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.21337890625,
+            "y": 0.9375,
+            "w": 1.40625,
+            "h": 0.015625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.25405740737915,
+            "y": 1.1070053577423096,
+            "w": 0.09133672714233398,
+            "h": 0.10588991641998291,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.451162338256836,
+            "y": 1.2242310047149658,
+            "w": 0.07924175262451172,
+            "h": 0.09807455539703369,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.25405740737915,
+            "y": 1.147612452507019,
+            "w": 1.2763466835021973,
+            "h": 0.13706183433532715,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.431072235107422,
+            "y": 1.3440732955932617,
+            "w": 0.06883716583251953,
+            "h": 0.11406409740447998,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.286121368408203,
+            "y": 1.5223979949951172,
+            "w": 0.053195953369140625,
+            "h": 0.09879779815673828,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.431072235107422,
+            "y": 1.3860282897949219,
+            "w": 0.9082450866699219,
+            "h": 0.1986243724822998,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.717189311981201,
+            "y": 1.6146137714385986,
+            "w": 0.028740882873535156,
+            "h": 0.11640501022338867,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.063175201416016,
+            "y": 1.7953819036483765,
+            "w": 0.020760536193847656,
+            "h": 0.0970984697341919,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.717189311981201,
+            "y": 1.657395362854004,
+            "w": 0.3667464256286621,
+            "h": 0.19914674758911133,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.8043532371521,
+            "y": 1.9124101400375366,
+            "w": 0.01934814453125,
+            "h": 0.11307251453399658,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.8043532371521,
+            "y": 2.0507047176361084,
+            "w": 0.01388692855834961,
+            "h": 0.09438705444335938,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.8043532371521,
+            "y": 1.9552714824676514,
+            "w": 0.24611520767211914,
+            "h": 0.15393805503845215,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.540903091430664,
+            "y": 2.2220983505249023,
+            "w": 0.06201457977294922,
+            "h": 0.10634875297546387,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.540903091430664,
+            "y": 2.2984683513641357,
+            "w": 0.047072410583496094,
+            "h": 0.09201908111572266,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.540903091430664,
+            "y": 2.264270067214966,
+            "w": 0.8109912872314453,
+            "h": 0.08983683586120605,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.333804130554199,
+            "y": 2.5261781215667725,
+            "w": 0.08846569061279297,
+            "h": 0.09934210777282715,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.333804130554199,
+            "y": 2.549326181411743,
+            "w": 0.07477664947509766,
+            "h": 0.09122395515441895,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.333804130554199,
+            "y": 2.5670812129974365,
+            "w": 1.2203140258789062,
+            "h": 0.03608870506286621,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.221506595611572,
+            "y": 2.8125,
+            "w": 0.09477615356445312,
+            "h": 0.09449124336242676,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.221506595611572,
+            "y": 2.8125,
+            "w": 0.0920405387878418,
+            "h": 0.09311699867248535,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.221506595611572,
+            "y": 2.8512585163116455,
+            "w": 1.400984287261963,
+            "h": 0.016361236572265625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.234796524047852,
+            "y": 3.0777719020843506,
+            "w": 0.08324527740478516,
+            "h": 0.09237456321716309,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.234796524047852,
+            "y": 3.0934321880340576,
+            "w": 0.09338569641113281,
+            "h": 0.09791707992553711,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.234796524047852,
+            "y": 3.1156680583953857,
+            "w": 1.3226995468139648,
+            "h": 0.03537797927856445,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.385524272918701,
+            "y": 3.3266544342041016,
+            "w": 0.059067726135253906,
+            "h": 0.09298419952392578,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.385524272918701,
+            "y": 3.391298294067383,
+            "w": 0.07492971420288086,
+            "h": 0.10536670684814453,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.385524272918701,
+            "y": 3.363379716873169,
+            "w": 0.998420238494873,
+            "h": 0.0915679931640625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.6537981033325195,
+            "y": 3.5688464641571045,
+            "w": 0.02754497528076172,
+            "h": 0.09529423713684082,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.6537981033325195,
+            "y": 3.6976935863494873,
+            "w": 0.03779792785644531,
+            "h": 0.11331510543823242,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.6537981033325195,
+            "y": 3.604862928390503,
+            "w": 0.48444080352783203,
+            "h": 0.16347455978393555,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.860269546508789,
+            "y": 3.816255807876587,
+            "w": 0.006957530975341797,
+            "h": 0.09812450408935547,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.97408390045166,
+            "y": 3.9983980655670166,
+            "w": 0.009730815887451172,
+            "h": 0.11855626106262207,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.860269546508789,
+            "y": 3.8521041870117188,
+            "w": 0.12354516983032227,
+            "h": 0.2219400405883789,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.590366363525391,
+            "y": 4.080831050872803,
+            "w": 0.04073333740234375,
+            "h": 0.10016441345214844,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.24325942993164,
+            "y": 4.278731346130371,
+            "w": 0.0545196533203125,
+            "h": 0.11820030212402344,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.590366363525391,
+            "y": 4.117068767547607,
+            "w": 0.7074127197265625,
+            "h": 0.23749828338623047,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.368813514709473,
+            "y": 4.372590065002441,
+            "w": 0.06989812850952148,
+            "h": 0.10001373291015625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 8.439050674438477,
+            "y": 4.529962539672852,
+            "w": 0.08476734161376953,
+            "h": 0.11131763458251953,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 7.368813514709473,
+            "y": 4.409735202789307,
+            "w": 1.1550045013427734,
+            "h": 0.19035625457763672,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 6.7733154296875,
+            "y": 5.09765625,
+            "w": 2.2862548828125,
+            "h": 0.15234375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.625,
+            "y": 0.375,
+            "w": 2.52880859375,
+            "h": 0.15234375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 3.27880859375,
+            "y": 0.447265625,
+            "w": 2.241943359375,
+            "h": 0.0078125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.625,
+            "y": 0.7412109375,
+            "w": 4.895751953125,
+            "h": 1.443603515625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.625,
+            "y": 2.3988037109375,
+            "w": 4.84375,
+            "h": 0.6749267578125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.625,
+            "y": 3.26123046875,
+            "w": 4.84375,
+            "h": 0.89990234375,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.625,
+            "y": 4.4375,
+            "w": 0.9921875,
+            "h": 0.8125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "icon",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 1.02734375,
+            "y": 4.6015625,
+            "w": 0.1875,
+            "h": 0.25,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 0.8626708984375,
+            "y": 4.9453125,
+            "w": 0.516845703125,
+            "h": 0.140625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 1.8046875,
+            "y": 4.4375,
+            "w": 0.9921875,
+            "h": 0.8125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "icon",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 2.20703125,
+            "y": 4.6015625,
+            "w": 0.1875,
+            "h": 0.25,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 2.0113525390625,
+            "y": 4.9453125,
+            "w": 0.5787353515625,
+            "h": 0.140625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 2.984375,
+            "y": 4.4375,
+            "w": 0.9921875,
+            "h": 0.8125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "icon",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 3.375,
+            "y": 4.6015625,
+            "w": 0.2109375,
+            "h": 0.25,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 3.1806640625,
+            "y": 4.9453125,
+            "w": 0.5994873046875,
+            "h": 0.140625,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "shape",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.1640625,
+            "y": 4.4375,
+            "w": 0.9921875,
+            "h": 0.8125,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "icon",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.578125,
+            "y": 4.6015625,
+            "w": 0.1640625,
+            "h": 0.25,
+            "unit": "inch"
+          },
+          "warnings": []
+        },
+        {
+          "element_id": null,
+          "kind": "text",
+          "mapping_mode": "native",
+          "object_ref": null,
+          "geometry": {
+            "x": 4.551513671875,
+            "y": 4.9453125,
+            "w": 0.21728515625,
+            "h": 0.140625,
+            "unit": "inch"
+          },
+          "warnings": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "native": 63,
+    "vector": 0,
+    "raster": 1,
+    "ignored": 0,
+    "unsupported": 0
+  },
+  "diagnostics": [
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    },
+    {
+      "rule_id": "DECKHTML_ANIMATION_UNMAPPED",
+      "severity": "warning",
+      "element_id": null,
+      "slide_id": "1",
+      "message": "Animation from css is outside the native PPTX entrance subset: infinite-loop animations map to emphasis effects, which are not supported yet (raw: rotateHelix). The element keeps its frozen end-state.",
+      "recovery": "Declare the animation explicitly with data-animation using a supported entrance effect: appear, fade-in, fly-in-left/right/top/bottom, zoom-in, spin, wipe-left/right/top/bottom."
+    }
+  ]
+}

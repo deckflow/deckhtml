@@ -1,0 +1,254 @@
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNA Presentation - Introduction</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        :root {
+            /* Master Palette Tokens */
+            --primary-1: #24164F;   /* Dark Purple */
+            --primary-2: #1FB7D6;   /* Cyan */
+            --bg-1: #F7F4EB;        /* Ivory Canvas */
+            --bg-2: #E8E4F7;        /* Lavender Panel */
+            --text-main: #172033;   /* Dark Navy */
+            --accent-1: #E85D75;    /* Rose */
+            
+            /* Component Tokens */
+            --radius-lg: 16px;
+            --border-alpha: rgba(23, 32, 51, 0.12);
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Arial", "Noto Sans SC";
+            color: var(--text-main);
+            overflow: hidden; 
+            font-weight: 300;
+        }
+
+        /* 16:9 Presentation Canvas - STRICTLY LOCKED */
+        .slide-canvas {
+            width: 1280px !important;
+            height: 720px !important;
+            min-width: 1280px !important;
+            min-height: 720px !important;
+            max-width: 1280px !important;
+            max-height: 720px !important;
+            background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-family: "Inter", "ZCOOL QingKe HuangYou";
+            color: var(--primary-1);
+            line-height: 1.1; 
+            font-weight: 700;
+        }
+
+        .content-shadow {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* --- DNA Helix Animation --- */
+        .dna-stage {
+            perspective: 1000px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .helix {
+            position: relative;
+            width: 200px;
+            height: 480px;
+            transform-style: preserve-3d;
+            animation: rotateHelix 15s linear infinite;
+        }
+
+        .base-pair {
+            position: absolute;
+            width: 180px;
+            height: 2px;
+            left: 50%;
+            margin-left: -90px;
+            transform-style: preserve-3d;
+        }
+
+        .base-pair::before, .base-pair::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            top: -5px;
+        }
+
+        .base-pair::before {
+            left: 0;
+            background-color: var(--primary-2);
+            box-shadow: 0 0 15px var(--primary-2);
+        }
+
+        .base-pair::after {
+            right: 0;
+            background-color: var(--accent-1);
+            box-shadow: 0 0 15px var(--accent-1);
+        }
+
+        .rung {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                rgba(31, 183, 214, 0.4) 0%, 
+                rgba(232, 93, 117, 0.4) 100%);
+        }
+
+        @keyframes rotateHelix {
+            from { transform: rotateY(0deg); }
+            to { transform: rotateY(360deg); }
+        }
+
+        /* Generate spiral positions */
+        .bp-1  { top: 0px;   transform: rotateY(0deg); }
+        .bp-2  { top: 35px;  transform: rotateY(25deg); }
+        .bp-3  { top: 70px;  transform: rotateY(50deg); }
+        .bp-4  { top: 105px; transform: rotateY(75deg); }
+        .bp-5  { top: 140px; transform: rotateY(100deg); }
+        .bp-6  { top: 175px; transform: rotateY(125deg); }
+        .bp-7  { top: 210px; transform: rotateY(150deg); }
+        .bp-8  { top: 245px; transform: rotateY(175deg); }
+        .bp-9  { top: 280px; transform: rotateY(200deg); }
+        .bp-10 { top: 315px; transform: rotateY(225deg); }
+        .bp-11 { top: 350px; transform: rotateY(250deg); }
+        .bp-12 { top: 385px; transform: rotateY(275deg); }
+        .bp-13 { top: 420px; transform: rotateY(300deg); }
+        .bp-14 { top: 455px; transform: rotateY(325deg); }
+
+        /* Entrance Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+        }
+
+        .delay-1 { animation-delay: 0.2s; }
+        .delay-2 { animation-delay: 0.4s; }
+        .delay-3 { animation-delay: 0.6s; }
+    </style>
+
+<style data-typeface-replacer="tailwind-default-fonts">
+html, body { font-family: "Arial", "Noto Sans SC", sans-serif !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300&amp;family=Inter:wght@700&amp;family=ZCOOL+QingKe+HuangYou:wght@400&amp;display=swap" rel="stylesheet">
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.pointer-events-none{pointer-events:none}.absolute{position:absolute}.relative{position:relative}.bottom-12{bottom:3rem}.left-0{left:0px}.right-\[-5\%\]{right:-5%}.top-0{top:0px}.top-\[-10\%\]{top:-10%}.z-10{z-index:10}.mb-3{margin-bottom:0.75rem}.mb-6{margin-bottom:1.5rem}.mt-8{margin-top:2rem}.flex{display:flex}.grid{display:grid}.h-\[1px\]{height:1px}.h-\[450px\]{height:450px}.h-\[600px\]{height:600px}.h-full{height:100%}.w-5\/12{width:41.666667%}.w-7\/12{width:58.333333%}.w-\[450px\]{width:450px}.w-\[600px\]{width:600px}.w-full{width:100%}.max-w-\[580px\]{max-width:580px}.max-w-\[620px\]{max-width:620px}.flex-grow{flex-grow:1}.grid-cols-4{grid-template-columns:repeat(4, minmax(0, 1fr))}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-4{gap:1rem}.gap-6{gap:1.5rem}.space-y-6 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem * var(--tw-space-y-reverse))}.rounded-\[var\(--radius-lg\)\]{border-radius:var(--radius-lg)}.rounded-full{border-radius:9999px}.border{border-width:1px}.p-5{padding:1.25rem}.py-12{padding-top:3rem;padding-bottom:3rem}.pl-20{padding-left:5rem}.pr-10{padding-right:2.5rem}.text-2xl{font-size:1.5rem;line-height:2rem}.text-\[12px\]{font-size:12px}.text-\[13px\]{font-size:13px}.text-\[18px\]{font-size:18px}.text-\[56px\]{font-size:56px}.font-bold{font-weight:700}.font-light{font-weight:300}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.italic{font-style:italic}.leading-\[1\.6\]{line-height:1.6}.tracking-wide{letter-spacing:0.025em}.tracking-wider{letter-spacing:0.05em}.opacity-20{opacity:0.2}.opacity-40{opacity:0.4}.opacity-60{opacity:0.6}.blur-\[80px\]{--tw-blur:blur(80px);filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}</style></head>
+<body>
+
+    <div class="slide-canvas">
+        
+        <div class="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none">
+            <div class="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full" style="background: radial-gradient(circle, var(--primary-2) 0%, transparent 70%);"></div>
+        </div>
+
+        
+        <div class="w-7/12 h-full flex flex-col justify-between pl-20 pr-10 py-12 z-10">
+            
+            <div class="animate-in mb-6 flex items-center gap-4">
+                <span style="color: var(--accent-1); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; font-size: 13px;">
+                    Preface | The Architecture of Life
+                </span>
+                <div class="flex-grow h-[1px]" style="background-color: var(--border-alpha);"></div>
+            </div>
+
+            
+            <h1 class="animate-in delay-1 text-[56px] mb-6">
+                The Miracle <br>
+                at the Core of <br>
+                <span style="color: var(--primary-2);">Biological Existence</span>
+            </h1>
+
+            
+            <div class="animate-in delay-2 text-[18px] leading-[1.6] space-y-6 max-w-[620px] font-light">
+                <p>
+                    In the vast expanse of the universe, life stands as the most breathtaking miracle. At the heart of this miracle lies a microscopic yet incredibly complex structure—the <strong class="font-semibold" style="color: var(--primary-1);">DNA Double Helix</strong>.
+                </p>
+                <p>
+                    It serves as a cryptic codebook left by nature, recording the past, present, and future of every living being. From the delicate bloom of a rose to the soaring eagle, from the giants of the deep to you—the blueprint is stored within this magnificent spiral.
+                </p>
+            </div>
+
+            
+            <div class="animate-in delay-3 mt-8 grid grid-cols-4 gap-6 max-w-[580px]">
+                <div class="flex flex-col items-center p-5 rounded-[var(--radius-lg)] border" style="border-color: var(--border-alpha); background: rgba(232, 228, 247, 0.3);">
+                    <i class="fa-solid fa-seedling text-2xl mb-3" style="color: var(--primary-2);"></i>
+                    <span class="text-[12px] font-bold tracking-wider uppercase opacity-60">The Rose</span>
+                </div>
+                <div class="flex flex-col items-center p-5 rounded-[var(--radius-lg)] border" style="border-color: var(--border-alpha); background: rgba(232, 228, 247, 0.3);">
+                    <i class="fa-solid fa-feather-pointed text-2xl mb-3" style="color: var(--primary-2);"></i>
+                    <span class="text-[12px] font-bold tracking-wider uppercase opacity-60">The Eagle</span>
+                </div>
+                <div class="flex flex-col items-center p-5 rounded-[var(--radius-lg)] border" style="border-color: var(--border-alpha); background: rgba(232, 228, 247, 0.3);">
+                    <i class="fa-solid fa-fish text-2xl mb-3" style="color: var(--primary-2);"></i>
+                    <span class="text-[12px] font-bold tracking-wider uppercase opacity-60">The Whale</span>
+                </div>
+                <div class="flex flex-col items-center p-5 rounded-[var(--radius-lg)] border" style="border-color: var(--accent-1); background: rgba(232, 93, 117, 0.05);">
+                    <i class="fa-solid fa-dna text-2xl mb-3" style="color: var(--accent-1);"></i>
+                    <span class="text-[12px] font-bold tracking-wider uppercase" style="color: var(--accent-1);">You</span>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="w-5/12 h-full relative flex items-center justify-center">
+            
+            <div class="absolute w-[450px] h-[450px] rounded-full blur-[80px]" style="background: radial-gradient(circle, var(--bg-2) 0%, transparent 70%); opacity: 0.7;"></div>
+            
+            <div class="dna-stage">
+                <div class="helix">
+                    <div class="base-pair bp-1"><div class="rung"></div></div>
+                    <div class="base-pair bp-2"><div class="rung"></div></div>
+                    <div class="base-pair bp-3"><div class="rung"></div></div>
+                    <div class="base-pair bp-4"><div class="rung"></div></div>
+                    <div class="base-pair bp-5"><div class="rung"></div></div>
+                    <div class="base-pair bp-6"><div class="rung"></div></div>
+                    <div class="base-pair bp-7"><div class="rung"></div></div>
+                    <div class="base-pair bp-8"><div class="rung"></div></div>
+                    <div class="base-pair bp-9"><div class="rung"></div></div>
+                    <div class="base-pair bp-10"><div class="rung"></div></div>
+                    <div class="base-pair bp-11"><div class="rung"></div></div>
+                    <div class="base-pair bp-12"><div class="rung"></div></div>
+                    <div class="base-pair bp-13"><div class="rung"></div></div>
+                    <div class="base-pair bp-14"><div class="rung"></div></div>
+                </div>
+            </div>
+
+            
+            <div class="absolute bottom-12 animate-in delay-3 italic opacity-40 text-[13px] font-medium tracking-wide">
+                FIG. 01: SYMBOLIC HELICAL ARCHITECTURE
+            </div>
+        </div>
+    </div>
+
+
+</body></html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>CSS 动画 · 位移推断 Fly In 四方向 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #0d9488; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #0d9488; }
+  .card { position: absolute; top: 236px; width: 280px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 18px 20px; }
+  .arrow { font-size: 30px; line-height: 1; color: #0d9488; }
+  .fx { margin-top: 8px; font-size: 20px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 10px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #0d9488; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #0d9488; background: #f0fdfa; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #0d9488; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+
+  /* —— 被自动推断的 CSS 动画（纯位移，无透明度） —— */
+  @keyframes cssFlyFromL { from { transform: translateX(-240px); } to { transform: translateX(0); } }
+  @keyframes cssFlyFromR { from { transform: translateX(240px); }  to { transform: translateX(0); } }
+  @keyframes cssFlyFromT { from { transform: translateY(-200px); } to { transform: translateY(0); } }
+  @keyframes cssFlyFromB { from { transform: translateY(200px); }  to { transform: translateY(0); } }
+  .anim-fly-l { animation: cssFlyFromL 0.8s ease-out both; }
+  .anim-fly-r { animation: cssFlyFromR 0.8s ease-out both; }
+  .anim-fly-t { animation: cssFlyFromT 0.8s ease-out both; }
+  .anim-fly-b { animation: cssFlyFromB 0.8s ease-out both; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-009">
+  <div class="header">
+    <div class="hrow"><span class="cat">CSS @keyframes 自动推断</span><span class="idx">09 / 19</span></div>
+    <h1>位移矢量推断 Fly In 方向</h1>
+    <p class="expect">预期 PPTX：4 个 <b>Fly In</b>（各 0.8s），方向由首末帧位移矢量决定 —— <b>自左 / 自右 / 自上 / 自下</b>；默认 afterPrevious 自动连播</p>
+  </div>
+
+  <div class="card anim-fly-l" style="left: 32px;" data-element-id="css-fly-left">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="arrow">→</div>
+      <div class="fx">translateX(-)→0</div>
+      <div class="code">from: translateX(-240px)<br>to: translateX(0)</div>
+      <div class="ppt">PPTX：<b>Fly In · From Left</b></div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card anim-fly-r" style="left: 344px;" data-element-id="css-fly-right">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="arrow">←</div>
+      <div class="fx">translateX(+)→0</div>
+      <div class="code">from: translateX(240px)<br>to: translateX(0)</div>
+      <div class="ppt">PPTX：<b>Fly In · From Right</b></div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card anim-fly-t" style="left: 656px;" data-element-id="css-fly-top">
+    <div class="bar" style="background: #ea580c;"></div>
+    <div class="cbody">
+      <div class="arrow">↓</div>
+      <div class="fx">translateY(-)→0</div>
+      <div class="code">from: translateY(-200px)<br>to: translateY(0)</div>
+      <div class="ppt">PPTX：<b>Fly In · From Top</b></div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="card anim-fly-b" style="left: 968px;" data-element-id="css-fly-bottom">
+    <div class="bar" style="background: #7c3aed;"></div>
+    <div class="cbody">
+      <div class="arrow">↑</div>
+      <div class="fx">translateY(+)→0</div>
+      <div class="code">from: translateY(200px)<br>to: translateY(0)</div>
+      <div class="ppt">PPTX：<b>Fly In · From Bottom</b></div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>4 个 Fly In 按 DOM 顺序自动连播，方向与卡片标注一致；位移方向取首→末帧的运动矢量（元素回到原位 = 从反方向飞入）。</div>
+</div>
+</body>
+</html>

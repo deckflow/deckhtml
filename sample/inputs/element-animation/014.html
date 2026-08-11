@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>组合场景 · 声明式覆盖 CSS 动画 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #ea580c; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #ea580c; }
+  .card { position: absolute; top: 236px; width: 520px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 20px 24px; }
+  .fx { font-size: 24px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 12px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #ea580c; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #ea580c; background: #fff7ed; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #ea580c; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+
+  /* —— 两个元素共用的 CSS 飞入动画 —— */
+  @keyframes cssFlyFromL {
+    from { opacity: 0; transform: translateX(-240px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .anim-fly { animation: cssFlyFromL 0.8s ease-out both; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-014">
+  <div class="header">
+    <div class="hrow"><span class="cat">组合场景 · 来源优先级</span><span class="idx">14 / 19</span></div>
+    <h1>同一元素：声明式优先于 CSS 捕获</h1>
+    <p class="expect">两个元素带<b>同一段 CSS 飞入动画</b>；左卡额外声明了 data-animation —— 预期 PPTX：左卡只有 <b>Zoom</b>（声明式胜出），右卡 <b>Fade + Fly In</b>（CSS 推断，对照组）</p>
+  </div>
+
+  <div class="card anim-fly" style="left: 96px;" data-element-id="mix-declared-wins"
+       data-animation="zoom-in" data-animation-duration="600" data-animation-trigger="click">
+    <div class="bar" style="background: #ea580c;"></div>
+    <div class="cbody">
+      <div class="fx">CSS fly + 声明 zoom</div>
+      <div class="code">CSS: animation: cssFlyFromL 0.8s both;<br>+ data-animation="zoom-in"</div>
+      <div class="ppt">PPTX：<b>仅 Zoom · 0.6s（click）</b><br>CSS 捕获被声明式覆盖</div>
+      <span class="trig">trigger: click（声明式）</span>
+    </div>
+  </div>
+
+  <div class="card anim-fly" style="left: 664px;" data-element-id="mix-css-only">
+    <div class="bar" style="background: #64748b;"></div>
+    <div class="cbody">
+      <div class="fx">仅 CSS fly（对照）</div>
+      <div class="code">CSS: animation: cssFlyFromL 0.8s both;<br>（无 data-animation）</div>
+      <div class="ppt">PPTX：<b>Fade + Fly In · From Left</b> 并行<br>CSS 推断结果</div>
+      <span class="trig">trigger: after（默认）</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>左卡在动画窗格中只有一条 Zoom（click 触发、0.6s），不应出现 Fly/Fade；右卡为 Fade+Fly 并行（after、0.8s）。验证「显式声明 wins over 环境动画」的覆盖规则。</div>
+</div>
+</body>
+</html>

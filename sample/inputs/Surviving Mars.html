@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surviving Mars: Environmental Overview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base Reset & Viewport Centering */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #0d0f12; /* Deep space background outside canvas */
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Strict 16:9 Canvas Container */
+        .slide-container {
+            width: 1280px;
+            height: 720px;
+            background-color: #0b0c10;
+            background-image: 
+                radial-gradient(circle at 100% 100%, rgba(224, 75, 43, 0.15) 0%, transparent 50%),
+                linear-gradient(135deg, #0b0c10 0%, #151821 100%);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255,255,255,0.05);
+            overflow: hidden;
+            display: flex;
+            position: relative;
+            color: #f3f4f6;
+        }
+
+        /* Abstract Mars Planet Graphic (CSS Only) */
+        .mars-sphere {
+            position: absolute;
+            bottom: -400px;
+            right: -250px;
+            width: 900px;
+            height: 900px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #e04b2b, #8a2a16, #1c0a06);
+            opacity: 0.4;
+            filter: blur(8px);
+            z-index: 0;
+        }
+
+        /* Tech Grid Overlay */
+        .tech-grid {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Columns Layout */
+        .col-left {
+            width: 45%;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            z-index: 2;
+            border-right: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .col-right {
+            width: 55%;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        /* Header Area */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            background-color: rgba(224, 75, 43, 0.15);
+            border: 1px solid rgba(224, 75, 43, 0.3);
+            color: #ff6b4a;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 24px;
+            width: fit-content;
+        }
+
+        .badge::before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #ff6b4a;
+            border-radius: 50%;
+            margin-right: 10px;
+            box-shadow: 0 0 10px #ff6b4a;
+        }
+
+        .main-title {
+            font-size: 56px;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -1.5px;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .main-title span {
+            color: #e04b2b;
+        }
+
+        /* Data Grid Area (Left) */
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px 24px;
+            margin-bottom: auto;
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .data-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 48px;
+            font-weight: 700;
+            color: #ff6b4a;
+            line-height: 1;
+            margin-bottom: 8px;
+            letter-spacing: -2px;
+        }
+
+        .data-value small {
+            font-size: 20px;
+            color: #9ca3af;
+            margin-left: 4px;
+        }
+
+        .data-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Quote Area */
+        .quote-block {
+            border-left: 4px solid #e04b2b;
+            padding-left: 24px;
+            background: linear-gradient(90deg, rgba(224, 75, 43, 0.08) 0%, transparent 100%);
+            padding: 20px 24px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .quote-text {
+            font-size: 16px;
+            font-style: italic;
+            color: #d1d5db;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        /* Right Column: Engineering Challenges */
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 32px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title::after {
+            content: "";
+            flex-grow: 1;
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin-left: 16px;
+        }
+
+        .challenge-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .challenge-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px 24px;
+            display: grid;
+            grid-template-columns: 40px 1fr 30px 1fr;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(10px);
+            transition: border-color 0.3s ease;
+        }
+
+        .challenge-card:hover {
+            border-color: rgba(224, 75, 43, 0.4);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .icon-box {
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .col-reality h4, .col-solution h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .col-reality p {
+            font-size: 15px;
+            font-weight: 600;
+            color: #e5e7eb;
+            line-height: 1.4;
+        }
+
+        .col-arrow {
+            color: #e04b2b;
+            font-size: 20px;
+            text-align: center;
+            opacity: 0.7;
+        }
+
+        .col-solution p {
+            font-size: 15px;
+            font-weight: 600;
+            color: #ffb4a2;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slide-container">
+        <!-- Background Elements -->
+        <div class="mars-sphere"></div>
+        <div class="tech-grid"></div>
+
+        <!-- Left Column: Context & Data -->
+        <div class="col-left">
+            <div class="badge">Environmental Brief</div>
+            
+            <h1 class="main-title">Surviving<br><span>Mars</span></h1>
+
+            <div class="data-grid">
+                <div class="data-item">
+                    <div class="data-value">-63<small>°C</small></div>
+                    <div class="data-label">Avg Surface Temp</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-value">1<small>%</small></div>
+                    <div class="data-label">Atmosphere Density</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-value">38<small>%</small></div>
+                    <div class="data-label">Earth's Gravity</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-value">250<small>mSv</small></div>
+                    <div class="data-label">Annual Radiation Exposure</div>
+                </div>
+            </div>
+
+            <div class="quote-block">
+                <p class="quote-text">"Mars offers no natural window of habitability. Every condition for human survival must be artificially engineered and maintained in strict closed loops."</p>
+            </div>
+        </div>
+
+        <!-- Right Column: Engineering Challenges Framework -->
+        <div class="col-right">
+            <h2 class="section-title">Core Survival Engineering</h2>
+            
+            <div class="challenge-list">
+                <!-- Challenge 1 -->
+                <div class="challenge-card">
+                    <div class="icon-box">💨</div>
+                    <div class="col-reality">
+                        <h4>Atmosphere</h4>
+                        <p>No Oxygen / 95% CO₂</p>
+                    </div>
+                    <div class="col-arrow">➔</div>
+                    <div class="col-solution">
+                        <h4>Solution</h4>
+                        <p>ISRU & MOXIE Oxygen Generators</p>
+                    </div>
+                </div>
+
+                <!-- Challenge 2 -->
+                <div class="challenge-card">
+                    <div class="icon-box">💧</div>
+                    <div class="col-reality">
+                        <h4>Water Supply</h4>
+                        <p>Locked in Subsurface Ice</p>
+                    </div>
+                    <div class="col-arrow">➔</div>
+                    <div class="col-solution">
+                        <h4>Solution</h4>
+                        <p>Thermal Extraction & 100% Recycling</p>
+                    </div>
+                </div>
+
+                <!-- Challenge 3 -->
+                <div class="challenge-card">
+                    <div class="icon-box">🌱</div>
+                    <div class="col-reality">
+                        <h4>Nutrition</h4>
+                        <p>Toxic Perchlorate Soil</p>
+                    </div>
+                    <div class="col-arrow">➔</div>
+                    <div class="col-solution">
+                        <h4>Solution</h4>
+                        <p>Closed-Loop Hydroponic Biospheres</p>
+                    </div>
+                </div>
+
+                <!-- Challenge 4 -->
+                <div class="challenge-card">
+                    <div class="icon-box">⚡</div>
+                    <div class="col-reality">
+                        <h4>Shelter & Power</h4>
+                        <p>High Radiation / Weak Solar</p>
+                    </div>
+                    <div class="col-arrow">➔</div>
+                    <div class="col-solution">
+                        <h4>Solution</h4>
+                        <p>Regolith Shields & Micro-Nuclear</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>声明式动画 · Spin 四档角度 · DeckHTML 验收</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { background: #eef2f7; }
+  .slide { position: relative; width: 1280px; height: 720px; overflow: hidden; background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%); }
+  .header { position: absolute; left: 56px; top: 36px; right: 56px; }
+  .hrow { display: flex; align-items: center; gap: 12px; }
+  .cat { font-size: 13px; font-weight: 700; color: #fff; background: #2563eb; padding: 5px 14px; border-radius: 999px; letter-spacing: 2px; }
+  .idx { margin-left: auto; font-size: 13px; color: #94a3b8; font-weight: 600; }
+  h1 { margin-top: 12px; font-size: 30px; color: #0f172a; }
+  .expect { margin-top: 8px; font-size: 14px; color: #475569; }
+  .expect b { color: #2563eb; }
+  .card { position: absolute; top: 236px; width: 280px; height: 252px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15,23,42,.06); overflow: hidden; }
+  .bar { height: 6px; }
+  .cbody { padding: 18px 20px; }
+  .deg { font-size: 30px; font-weight: 800; line-height: 1; color: #2563eb; }
+  .fx { margin-top: 8px; font-size: 20px; font-weight: 800; color: #0f172a; }
+  .code { margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 8px 10px; color: #334155; line-height: 1.7; }
+  .ppt { margin-top: 10px; font-size: 13px; color: #64748b; line-height: 1.6; }
+  .ppt b { color: #2563eb; }
+  .trig { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: #2563eb; background: #eff6ff; border-radius: 6px; padding: 3px 10px; }
+  .footer { position: absolute; left: 56px; right: 56px; bottom: 24px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 10px; font-size: 13px; line-height: 1.7; color: #64748b; }
+  .footer b { color: #0f172a; }
+</style>
+</head>
+<body>
+<div class="slide" data-slide-id="anim-004">
+  <div class="header">
+    <div class="hrow"><span class="cat">声明式 · data-animation</span><span class="idx">04 / 19</span></div>
+    <h1>Spin · 四档旋转角度</h1>
+    <p class="expect">预期 PPTX：4 个<b>单击触发</b>的 <b>Spin</b>（强调类，原地顺时针旋转），角度分别为 <b>360° / 90° / 180° / 720°</b></p>
+  </div>
+
+  <div class="card" style="left: 32px;" data-element-id="decl-spin"
+       data-animation="spin" data-animation-duration="800" data-animation-trigger="click">
+    <div class="bar" style="background: #2563eb;"></div>
+    <div class="cbody">
+      <div class="deg">360°</div>
+      <div class="fx">spin（默认）</div>
+      <div class="code">data-animation="spin"</div>
+      <div class="ppt">PPTX：<b>Spin</b>，旋转 360°</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 344px;" data-element-id="decl-spin-quarter"
+       data-animation="spin-quarter" data-animation-duration="800" data-animation-trigger="click">
+    <div class="bar" style="background: #0d9488;"></div>
+    <div class="cbody">
+      <div class="deg">90°</div>
+      <div class="fx">spin-quarter</div>
+      <div class="code">data-animation="spin-quarter"</div>
+      <div class="ppt">PPTX：<b>Spin</b>，旋转 90°</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 656px;" data-element-id="decl-spin-half"
+       data-animation="spin-half" data-animation-duration="800" data-animation-trigger="click">
+    <div class="bar" style="background: #ea580c;"></div>
+    <div class="cbody">
+      <div class="deg">180°</div>
+      <div class="fx">spin-half</div>
+      <div class="code">data-animation="spin-half"</div>
+      <div class="ppt">PPTX：<b>Spin</b>，旋转 180°</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="card" style="left: 968px;" data-element-id="decl-spin-double"
+       data-animation="spin-double" data-animation-duration="1200" data-animation-trigger="click">
+    <div class="bar" style="background: #7c3aed;"></div>
+    <div class="cbody">
+      <div class="deg">720°</div>
+      <div class="fx">spin-double</div>
+      <div class="code">data-animation="spin-double"<br>duration 1200ms</div>
+      <div class="ppt">PPTX：<b>Spin</b>，旋转 720°（两圈）</div>
+      <span class="trig">trigger: click</span>
+    </div>
+  </div>
+
+  <div class="footer"><b>验收要点：</b>Spin 是<b>强调动画</b>——元素在幻灯片上始终可见，单击后原地顺时针旋转对应角度；动画窗格中图标为黄色星形（强调），可在效果选项中核对旋转量。</div>
+</div>
+<script src="vendor/preview-declared.js"></script>
+</body>
+</html>

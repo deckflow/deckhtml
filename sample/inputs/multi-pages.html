@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 优化诊断仪表盘</title>
+    
+    <!-- 引入字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- MathJax -->
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']]
+        },
+        svg: {
+          fontCache: 'global'
+        }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+
+    <style>
+        :root {
+            --bg-page: #080b11;
+            --bg-card: rgba(17, 24, 39, 0.6);
+            --border-color: rgba(255, 255, 255, 0.05);
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+            --primary: #6366f1;
+            --accent-green: #10b981;
+            --accent-rose: #f43f5e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            width: 100vw;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 40px 20px;
+            overflow-y: auto; /* 允许滚动查看多页 */
+            gap: 40px; /* 幻灯片之间的间隔 */
+        }
+
+        /* 16:9 比例主幻灯片卡片，强制防止垂直溢出 */
+        .slide-deck {
+            width: 95vw;
+            max-width: 1200px;
+            aspect-ratio: 16 / 9;
+            max-height: 90vh; /* 决不超过视口高度 */
+            background-color: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px 32px;
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .title-group h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-group p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        .sys-badge {
+            font-size: 0.7rem;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            padding: 3px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            font-weight: 600;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 4.2fr 7.8fr;
+            gap: 20px;
+            flex: 1;
+            min-height: 0; /* 允许高度自适应收缩 */
+            margin-bottom: 12px;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: 0;
+        }
+
+        .panel-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .card-header {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e2e8f0;
+        }
+
+        /* 紧凑公式布局 */
+        .formula-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px dashed rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            padding: 8px;
+            min-height: 70px;
+        }
+
+        .formula-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        /* 紧凑表格 */
+        .table-wrapper {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 8px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.68rem;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            color: #cbd5e1;
+        }
+
+        .td-highlight {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        /* 右半部分 */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: 0;
+        }
+
+        .chart-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .chart-wrapper {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+
+        /* 状态卡片行 */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .metric-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        /* 页脚 */
+        footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border-color);
+            padding-top: 10px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .footer-logo {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        /* 代码块语法高亮 */
+        .code-box {
+            background: #05070c;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.65rem;
+            line-height: 1.35;
+            color: #cbd5e1;
+            overflow: hidden;
+            margin: 0;
+            text-align: left;
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+        .code-box code {
+            width: 100%;
+        }
+        .code-comment { color: #475569; font-style: italic; }
+        .code-keyword { color: #f43f5e; font-weight: 600; }
+        .code-builtin { color: #818cf8; }
+        .code-number { color: #38bdf8; }
+    </style>
+</head>
+<body>
+
+    <div class="slide-deck">
+        
+        <header>
+            <div class="title-group">
+                <h1>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                    损失函数优化与梯度下降
+                </h1>
+                <p>模型收敛与性能诊断指标分析</p>
+            </div>
+            <div class="sys-badge">运行状态：正常</div>
+        </header>
+
+        <main class="main-layout">
+            
+            <div class="left-panel">
+                
+                <!-- 目标函数 -->
+                <div class="panel-card">
+                    <div class="card-header">
+                        🔑 损失与更新目标函数
+                    </div>
+                    <div class="formula-box">
+                        $$L(w, b) = \frac{1}{m} \sum_{i=1}^{m} L_{CE}(f(x^{(i)}), y^{(i)})$$
+                        $$\theta_{t+1} = \theta_t - \eta \cdot \frac{\partial L}{\partial \theta_t}$$
+                    </div>
+                    <p class="formula-desc">基于交叉熵损失通过反向传播执行权重更新</p>
+                </div>
+
+                <!-- 优化算法对比 -->
+                <div class="panel-card" style="flex: 1;">
+                    <div class="card-header">
+                        📊 优化算法效率对比
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>优化算法</th>
+                                    <th>收敛速度</th>
+                                    <th>内存占用</th>
+                                    <th>综合评价</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>SGD</td>
+                                    <td>较慢</td>
+                                    <td>极低</td>
+                                    <td>基准方案</td>
+                                </tr>
+                                <tr>
+                                    <td>Momentum</td>
+                                    <td>中等</td>
+                                    <td>极低</td>
+                                    <td>一般</td>
+                                </tr>
+                                <tr>
+                                    <td class="td-highlight">Adam</td>
+                                    <td class="td-highlight">极快</td>
+                                    <td>中等</td>
+                                    <td class="td-highlight">优秀</td>
+                                </tr>
+                                <tr>
+                                    <td>RMSprop</td>
+                                    <td>较快</td>
+                                    <td>中等</td>
+                                    <td>良好</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="right-panel">
+                
+                <!-- 图表 -->
+                <div class="panel-card chart-card">
+                    <div class="card-header">
+                        📈 训练与验证损失值收敛曲线
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="lossChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 状态卡片行 -->
+                <div class="metrics-row">
+                    
+                    <div class="metric-card">
+                        <div class="icon-circle">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <div class="metric-info">
+                            <span class="metric-label">准确率</span>
+                            <span class="metric-value">98.42%</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="icon-circle" style="color: var(--accent-green); background: rgba(16, 185, 129, 0.1);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        </div>
+                        <div class="metric-info">
+                            <span class="metric-label">学习率</span>
+                            <span class="metric-value">0.001</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="icon-circle" style="color: var(--accent-rose); background: rgba(244, 63, 94, 0.1);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </div>
+                        <div class="metric-info">
+                            <span class="metric-label">迭代周期</span>
+                            <span class="metric-value">150 / 150</span>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </main>
+
+        <footer>
+            <span class="footer-logo">算法优化诊断中心</span>
+            <span>系统状态：最佳状态</span>
+        </footer>
+
+    </div>
+
+    <!-- 第二页：反向传播与 Adam 优化流水线 -->
+    <div class="slide-deck">
+        
+        <header>
+            <div class="title-group">
+                <h1>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    反向传播优化控制流水线
+                </h1>
+                <p>梯度计算流与自适应力矩 (Adam) 状态更新机制</p>
+            </div>
+            <div class="sys-badge">流水线状态：就绪</div>
+        </header>
+
+        <main class="main-layout" style="display: flex; flex-direction: column; gap: 16px; min-height: 0;">
+            
+            <!-- 上半部分：流程图 -->
+            <div class="panel-card" style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 12px 20px; overflow: hidden; min-height: 0;">
+                <div class="card-header" style="margin-bottom: 6px;">
+                    ⛓️ 训练迭代控制环流 (Computational Flow)
+                </div>
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden;">
+                    <svg viewBox="10 12 530 70" style="width: 100%; max-height: 130px; padding: 6px 0;" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="grad-node" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(99, 102, 241, 0.15)"/>
+                                <stop offset="100%" stop-color="rgba(16, 185, 129, 0.05)"/>
+                            </linearGradient>
+                            <linearGradient id="grad-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#6366f1"/>
+                                <stop offset="100%" stop-color="#10b981"/>
+                            </linearGradient>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b"/>
+                            </marker>
+                            <marker id="arrow-glow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10b981"/>
+                            </marker>
+                        </defs>
+
+                        <!-- 节点指向箭头 -->
+                        <line x1="75" y1="35" x2="105" y2="35" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+                        <line x1="185" y1="35" x2="215" y2="35" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+                        <line x1="295" y1="35" x2="325" y2="35" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+                        <line x1="410" y1="35" x2="440" y2="35" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+                        <!-- 闭环反馈线 -->
+                        <path d="M 487.5 55 L 487.5 75 L 45 75 L 45 55" fill="none" stroke="url(#grad-glow)" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrow-glow)"/>
+
+                        <!-- 节点 1 -->
+                        <rect x="15" y="15" width="60" height="40" rx="8" fill="url(#grad-node)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                        <text x="45" y="32" font-family="Inter" font-size="9" fill="#f8fafc" text-anchor="middle" font-weight="bold">输入数据</text>
+                        <text x="45" y="44" font-family="Inter" font-size="7.5" fill="#64748b" text-anchor="middle">{(X, Y)}</text>
+
+                        <!-- 节点 2 -->
+                        <rect x="105" y="15" width="80" height="40" rx="8" fill="url(#grad-node)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                        <text x="145" y="32" font-family="Inter" font-size="9" fill="#f8fafc" text-anchor="middle" font-weight="bold">前向传播</text>
+                        <text x="145" y="44" font-family="Inter" font-size="7.5" fill="#64748b" text-anchor="middle">ŷ = f(X; W, b)</text>
+
+                        <!-- 节点 3 -->
+                        <rect x="215" y="15" width="80" height="40" rx="8" fill="url(#grad-node)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                        <text x="255" y="32" font-family="Inter" font-size="9" fill="#f8fafc" text-anchor="middle" font-weight="bold">计算损失</text>
+                        <text x="255" y="44" font-family="Inter" font-size="7.5" fill="#64748b" text-anchor="middle">L(ŷ, Y)</text>
+
+                        <!-- 节点 4 -->
+                        <rect x="325" y="15" width="85" height="40" rx="8" fill="url(#grad-node)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                        <text x="367.5" y="32" font-family="Inter" font-size="9" fill="#f8fafc" text-anchor="middle" font-weight="bold">反向传播</text>
+                        <text x="367.5" y="44" font-family="Inter" font-size="7.5" fill="#64748b" text-anchor="middle">计算梯度 ∇L</text>
+
+                        <!-- 节点 5 -->
+                        <rect x="440" y="15" width="95" height="40" rx="8" fill="url(#grad-node)" stroke="url(#grad-glow)" stroke-width="1"/>
+                        <text x="487.5" y="32" font-family="Inter" font-size="9" fill="#f8fafc" text-anchor="middle" font-weight="bold">参数更新 (Adam)</text>
+                        <text x="487.5" y="44" font-family="Inter" font-size="7" fill="#a5b4fc" text-anchor="middle">θ = θ - η·m̂/(√v̂+ε)</text>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- 下半部分：左右分栏 -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1.2; min-height: 0;">
+                <!-- 左侧：Adam 算法公式 -->
+                <div class="panel-card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 12px 20px; overflow: hidden; min-height: 0;">
+                    <div class="card-header" style="margin-bottom: 4px;">
+                        🧬 Adam 算法一阶/二阶矩更新细节
+                    </div>
+                    <div class="formula-box" style="flex: 1; justify-content: center; min-height: 0; padding: 4px; overflow: hidden; font-size: 0.72rem;">
+                        $$g_t = \nabla_\theta L(\theta_t) \quad , \quad \theta_{t+1} = \theta_t - \frac{\eta}{\sqrt{\hat{v}_t} + \epsilon} \hat{m}_t$$
+                        $$m_t = \beta_1 m_{t-1} + (1-\beta_1)g_t \quad , \quad v_t = \beta_2 v_{t-1} + (1-\beta_2)g_t^2$$
+                        $$\hat{m}_t = \frac{m_t}{1-\beta_1^t} \quad , \quad \hat{v}_t = \frac{v_t}{1-\beta_2^t}$$
+                    </div>
+                </div>
+
+                <!-- 右侧：PyTorch 实现核心代码 -->
+                <div class="panel-card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 12px 20px; overflow: hidden; min-height: 0;">
+                    <div class="card-header" style="margin-bottom: 4px;">
+                        💻 Adam 核心参数更新步骤 (PyTorch 逻辑)
+                    </div>
+                    <pre class="code-box"><code><span class="code-keyword">for</span> t <span class="code-keyword">in</span> <span class="code-builtin">range</span>(<span class="code-number">1</span>, epochs + <span class="code-number">1</span>):
+    g = grad(loss, theta)  <span class="code-comment"># 计算当前梯度</span>
+    m = b1 * m + (<span class="code-number">1</span> - b1) * g  <span class="code-comment"># 一阶动量更新</span>
+    v = b2 * v + (<span class="code-number">1</span> - b2) * (g ** <span class="code-number">2</span>)  <span class="code-comment"># 二阶动量更新</span>
+    m_hat = m / (<span class="code-number">1</span> - b1 ** t)  <span class="code-comment"># 一阶偏差修正</span>
+    v_hat = v / (<span class="code-number">1</span> - b2 ** t)  <span class="code-comment"># 二阶偏差修正</span>
+    theta -= eta * m_hat / (np.sqrt(v_hat) + eps)  <span class="code-comment"># 权重参数更新</span></code></pre>
+                </div>
+            </div>
+
+        </main>
+
+        <footer>
+            <span class="footer-logo">算法优化诊断中心</span>
+            <span>数据处理流：状态最佳</span>
+        </footer>
+
+    </div>
+
+    <!-- 图表配置 -->
+    <script>
+        const ctx = document.getElementById('lossChart').getContext('2d');
+        
+        const trainGradient = ctx.createLinearGradient(0, 0, 0, 150);
+        trainGradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+        trainGradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+        
+        const valGradient = ctx.createLinearGradient(0, 0, 0, 150);
+        valGradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+        valGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['0', '20', '40', '60', '80', '100', '120', '140', '150'],
+                datasets: [
+                    {
+                        label: '损失值收敛度 (Loss)',
+                        data: [0.92, 0.51, 0.33, 0.21, 0.14, 0.09, 0.06, 0.04, 0.03],
+                        borderColor: '#6366f1',
+                        backgroundColor: '#6366f1',
+                        borderWidth: 3,
+                        pointRadius: 2,
+                        fill: false,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#94a3b8',
+                            font: { size: 9, family: 'Inter' },
+                            boxWidth: 15,
+                            usePointStyle: true,
+                            pointStyle: 'line'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: '#64748b', font: { size: 9 } }
+                    },
+                    y: {
+                        min: 0,
+                        max: 1.0,
+                        grid: {
+                            display: true,
+                            color: '#1e293b',
+                            drawTicks: false
+                        },
+                        border: { display: false },
+                        ticks: {
+                            color: '#64748b',
+                            font: { size: 9 },
+                            stepSize: 0.2,
+                            callback: function(value) {
+                                return value.toFixed(1);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
