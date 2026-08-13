@@ -19,7 +19,7 @@ const SIZE_CSS_VAR_PREFIXES = ['deck', 'page', 'slide', 'canvas'] as const;
 
 /** Selectors that commonly declare a fixed slide/canvas box in px. */
 const SLIDE_HOST_SELECTOR_RE =
-  /(?:^|[,{\s])(?:html|body|\.slide-page|\.slide-container|\.slide-wrap|\.slide-canvas|\.slide|#slide)(?=[\s,{.#:[>+~]|$)/i;
+  /(?:^|[,{\s])(?:html|body|\.slide-page|\.slide-container|\.slide-wrap|\.slide-canvas|\.slide|\.imported-theme-root|#slide)(?=[\s,{.#:[>+~]|$)/i;
 
 function isPositiveSize(width: number, height: number): boolean {
   return (
@@ -46,8 +46,13 @@ export function parseWxH(text: string): ViewportSize | null {
   return isPositiveSize(width, height) ? { width, height } : null;
 }
 
+/** Parse a CSS px length, tolerating trailing `!important`. */
 function parseCssPxLength(value: string): number | null {
-  const match = value.trim().match(/^(-?[\d.]+)\s*px$/i);
+  const match = value
+    .trim()
+    .replace(/\s*!important\s*$/i, '')
+    .trim()
+    .match(/^(-?[\d.]+)\s*px$/i);
   if (!match) return null;
   const n = parseFloat(match[1]!);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
@@ -170,20 +175,36 @@ export function extractInlineStyleBlocks(html: string): string {
  * CSS chunks safe to scan with the CSS-rule regex.
  * Prefer `<style>` contents when present; skip HTML markup (no style tags);
  * otherwise treat the whole string as CSS (linked stylesheets / pure CSS).
+ *
+ * Important: extracted CSS may embed SVG/data URLs containing `<svg`, so we must
+ * not treat "any `<` tag" as HTML — only document-like markup without `<style>`.
  */
 function cssChunksForRuleScan(cssOrHtml: string): string[] {
   const inline = extractInlineStyleBlocks(cssOrHtml);
   if (inline) return [inline];
-  // HTML without <style> — do not scan body / base64 blobs.
-  if (/<[a-zA-Z!/?]/.test(cssOrHtml)) return [];
+  // HTML without <style> — do not scan body / data-URI attribute blobs.
+  if (looksLikeHtmlWithoutStyle(cssOrHtml)) return [];
   return [cssOrHtml];
+}
+
+function looksLikeHtmlWithoutStyle(text: string): boolean {
+  // Fast path: CSS / JSON / plain text rarely start with a document tag.
+  if (!/^\s*</.test(text)) return false;
+  return /<(?:!doctype\s+html|html\b|head\b|body\b|meta\b|link\b|script\b|img\b|div\b|section\b|article\b)\b/i.test(
+    text
+  );
 }
 
 /**
  * Read fixed `width`/`height` px on common slide host / root selectors.
  * Scans only CSS (inline `<style>` blocks or pure stylesheet text), never raw HTML.
+ * When several hosts declare px sizes, prefer the largest area (design canvas over
+ * fluid/vw fallbacks or smaller chrome boxes).
  */
 export function parseFixedSlideHostSize(cssOrHtml: string): ViewportSize | null {
+  let best: ViewportSize | null = null;
+  let bestArea = 0;
+
   for (const css of cssChunksForRuleScan(cssOrHtml)) {
     // Match CSS rule blocks; keep it simple (no nested @rules required for our cases).
     const ruleRe = /([^{}@]+)\{([^{}]+)\}/g;
@@ -201,10 +222,14 @@ export function parseFixedSlideHostSize(cssOrHtml: string): ViewportSize | null 
       if (width == null || height == null) continue;
       // Ignore tiny decorative boxes accidentally matching a host selector.
       if (width < 320 || height < 180) continue;
-      return { width, height };
+      const area = width * height;
+      if (area > bestArea) {
+        best = { width, height };
+        bestArea = area;
+      }
     }
   }
-  return null;
+  return best;
 }
 
 /**

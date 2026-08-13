@@ -200,17 +200,38 @@ async function processSingleInput(
       }
     }
 
-    const inspector = new ElementInspector(page);
+    let inspector = new ElementInspector(page);
     const autoDetect = options.autoDetectSlides !== false;
-    const discovered = await inspector.discoverSlideContainers(
+    let discovered = await inspector.discoverSlideContainers(
       options.slideSelector,
       autoDetect
     );
+
+    let iframeDeckDispose: (() => Promise<void>) | undefined;
+    if (
+      discovered.count < 2 &&
+      autoDetect &&
+      !options.slideSelector?.trim() &&
+      (options.iframes ?? 'inspect') === 'inspect'
+    ) {
+      const promoted = await inspector.tryPromoteLargeIframeDeck({
+        iframes: options.iframes,
+        iframeLoadTimeoutMs: options.iframeLoadTimeoutMs,
+        allowLocalResources: options.allowLocalResources,
+        resourcePolicy: options.resourcePolicy,
+      });
+      if (promoted) {
+        discovered = promoted.discovery;
+        inspector = promoted.inspector;
+        iframeDeckDispose = promoted.dispose;
+      }
+    }
 
     let slidesMap: Map<number, ElementInfo[]>;
     let slideCoordsNormalized = false;
     const excludedCounter = { value: 0 };
 
+    try {
     if (discovered.count >= 2) {
       if (options.splitByHeight) {
         console.warn(
@@ -240,7 +261,11 @@ async function processSingleInput(
       };
       const slideConcurrency =
         runtime?.slideInspectConcurrency ?? resolveSlideInspectConcurrency();
-      if (slideConcurrency > 1 && discovered.count > 1) {
+      // Iframe-promoted decks live on a temporary child page — parallel workers
+      // reload the outer HTML file and would miss the inner deck.
+      const canParallel =
+        !iframeDeckDispose && slideConcurrency > 1 && discovered.count > 1;
+      if (canParallel) {
         console.log(
           `⚡ Parallel inspect: ${slideConcurrency} Playwright pages (CPU cores − 2)`
         );
@@ -317,6 +342,9 @@ async function processSingleInput(
       excludedCount: excludedCounter.value,
       animationDiagnostics,
     };
+    } finally {
+      await iframeDeckDispose?.().catch(() => {});
+    }
   } finally {
     await loader.close().catch(() => {});
   }

@@ -127,6 +127,44 @@ describe('parseFixedSlideHostSize', () => {
     const css = `.slide { width: 10px; height: 10px; }`;
     assert.equal(parseFixedSlideHostSize(css), null);
   });
+
+  it('accepts px values with !important', () => {
+    const css = `.slide{width:1920px!important;height:1080px!important;overflow:hidden!important}`;
+    assert.deepEqual(parseFixedSlideHostSize(css), {
+      width: 1920,
+      height: 1080,
+    });
+  });
+
+  it('reads .imported-theme-root fixed canvas', () => {
+    const css = `
+.slide { width: var(--deck-w); height: var(--deck-h); }
+.imported-theme-root { width: 1920px; height: 1080px; transform: scale(var(--deck-scale)); }`;
+    assert.deepEqual(parseFixedSlideHostSize(css), {
+      width: 1920,
+      height: 1080,
+    });
+  });
+
+  it('prefers the largest fixed host when several match', () => {
+    const css = `
+.slide { width: 640px; height: 360px; }
+.imported-theme-root { width: 1920px; height: 1080px; }`;
+    assert.deepEqual(parseFixedSlideHostSize(css), {
+      width: 1920,
+      height: 1080,
+    });
+  });
+
+  it('still scans CSS that embeds SVG markup in data URLs', () => {
+    const css = `
+.icon { background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'></svg>"); }
+.imported-theme-root { width: 1920px; height: 1080px; }`;
+    assert.deepEqual(parseFixedSlideHostSize(css), {
+      width: 1920,
+      height: 1080,
+    });
+  });
 });
 
 describe('parseStageJson', () => {
@@ -159,6 +197,22 @@ describe('detectViewportFromHtml', () => {
 
   it('falls back to viewport meta when no deck-size or CSS vars', () => {
     const html = `<!doctype html><meta name="viewport" content="width=1920, initial-scale=1"><title>x</title>`;
+    assert.deepEqual(detectViewportFromHtml(html), {
+      width: 1920,
+      height: 1080,
+    });
+  });
+
+  it('detects 1920×1080 from export/print slide overrides with !important', () => {
+    const html = `<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root { --deck-w: 100vw; --deck-h: 56.25vw; }
+.slide { width: var(--deck-w); height: var(--deck-h); }
+.imported-theme-root { width: 1920px; height: 1080px; }
+html,body{width:1920px!important;height:auto!important}
+.slide{width:1920px!important;height:1080px!important}
+</style>`;
     assert.deepEqual(detectViewportFromHtml(html), {
       width: 1920,
       height: 1080,

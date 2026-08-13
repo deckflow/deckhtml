@@ -12,6 +12,7 @@ export function applyImageRoundRectToXml(
     imageWidthInch: number;
     imageHeightInch: number;
     elementIndex: number;
+    picIndex?: number;
   }
 ): string {
   const { imageBorderRadiusPx, imageWidthInch, imageHeightInch } = enhancement;
@@ -29,24 +30,25 @@ export function applyImageRoundRectToXml(
   const picMatches = Array.from(slideXml.matchAll(/<p:pic>[\s\S]*?<\/p:pic>/g));
   if (picMatches.length === 0) return slideXml;
 
-  let modifiedXml = slideXml;
-
-  for (const picMatch of picMatches) {
-    const picXml = picMatch[0];
-    if (!picXml.includes('<a:prstGeom')) continue;
-
-    // Replace rect with roundRect and add adj
-    // Pattern: <a:prstGeom prst="rect"><a:avLst/></a:prstGeom> or similar
-    let modifiedPicXml = picXml.replace(
-      /<a:prstGeom prst="rect">([\s\S]*?)<\/a:prstGeom>/,
-      `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${adjClamped}"/></a:avLst></a:prstGeom>`
-    );
-
-    if (modifiedPicXml !== picXml) {
-      modifiedXml = modifiedXml.replace(picXml, modifiedPicXml);
-      break; // Only modify the first matching pic (by elementIndex we could be more precise)
-    }
+  const { picIndex } = enhancement;
+  if (
+    picIndex !== undefined &&
+    (!Number.isInteger(picIndex) || picIndex < 0 || picIndex >= picMatches.length)
+  ) {
+    return slideXml;
   }
 
-  return modifiedXml;
+  const targetMatch = picMatches[picIndex ?? 0];
+  const matchStart = targetMatch?.index;
+  if (!targetMatch || matchStart === undefined) return slideXml;
+
+  const picXml = targetMatch[0];
+  const modifiedPicXml = picXml.replace(
+    /<a:prstGeom prst="rect">([\s\S]*?)<\/a:prstGeom>/,
+    `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${adjClamped}"/></a:avLst></a:prstGeom>`
+  );
+  if (modifiedPicXml === picXml) return slideXml;
+
+  const matchEnd = matchStart + picXml.length;
+  return `${slideXml.slice(0, matchStart)}${modifiedPicXml}${slideXml.slice(matchEnd)}`;
 }

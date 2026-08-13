@@ -6,7 +6,11 @@
 import { Page } from 'playwright-core';
 import { fileURLToPath } from 'url';
 import { ElementInfo, ElementType, ComputedStyles, TableData } from './types';
-import { getSlideHeightPx, getSlideWidthPx } from './utils/coordinate';
+import {
+  getSlideHeightPx,
+  getSlideWidthPx,
+  setViewportPixels,
+} from './utils/coordinate';
 import { convertMathmlToOmml } from './utils/mathml-to-omml';
 import { isLightTextColor } from './utils/omml-style';
 import { gotoAndSettle } from './utils/navigate';
@@ -42,6 +46,12 @@ export interface SlideProbeRule {
   classTokenPattern?: string;
   /** Require visible textual or media-like content before accepting a fallback host. */
   requireMeaningfulContent?: boolean;
+  /**
+   * Allow a strong semantic rule to accept sibling slide hosts rendered as
+   * proportional thumbnails of the conversion viewport. Generic fallbacks must
+   * leave this disabled.
+   */
+  allowScaledViewportHosts?: boolean;
 }
 
 /** Metadata for slide decks gated by a mutually-exclusive CSS class (e.g. `.active`). */
@@ -56,6 +66,18 @@ export interface SlideContainerDiscovery {
   rule?: string;
   /** Present when slides are stacked and visibility is toggled via a CSS class. */
   activeDeck?: ActiveGatedDeckInfo;
+}
+
+/**
+ * Result of promoting a near-full-viewport iframe that contains a multi-slide deck.
+ * Small iframes are never promoted — they stay ordinary embedded elements.
+ */
+export interface IframeDeckPromotion {
+  discovery: SlideContainerDiscovery;
+  /** Inspector bound to the iframe document (not the outer shell page). */
+  inspector: ElementInspector;
+  /** Close the temporary child page opened for the iframe document. */
+  dispose: () => Promise<void>;
 }
 
 export interface InspectElementsOptions {
@@ -94,14 +116,25 @@ const SLIDE_ISOLATION_ATTR = 'data-deckhtml-slide-hidden';
 const SLIDE_CANDIDATE_ATTR = 'data-deckhtml-slide-candidate';
 /** Pause after isolating a slide so CSS/JS entrance animations can finish. */
 const SLIDE_ISOLATION_ANIMATION_SETTLE_MS = 3000;
+/**
+ * Near-full-viewport gate shared by slide hosts and deck-hosting iframes.
+ * Small embeds (e.g. 900×480 demos) stay ordinary iframe elements.
+ */
+export const SLIDE_HOST_SIZE = {
+  heightMinRatio: 0.5,
+  heightMaxRatio: 2.0,
+  widthMinRatio: 0.8,
+} as const;
 /** Qualified slide host height must be within [min, max] × viewport slide height. */
-const SLIDE_HEIGHT_MIN_RATIO = 0.5;
-const SLIDE_HEIGHT_MAX_RATIO = 2.0;
+const SLIDE_HEIGHT_MIN_RATIO = SLIDE_HOST_SIZE.heightMinRatio;
+const SLIDE_HEIGHT_MAX_RATIO = SLIDE_HOST_SIZE.heightMaxRatio;
 /** Qualified slide host width must be at least this fraction of viewport slide width. */
-const SLIDE_WIDTH_MIN_RATIO = 0.8;
+const SLIDE_WIDTH_MIN_RATIO = SLIDE_HOST_SIZE.widthMinRatio;
+/** Minimum thumbnail scale accepted for strong semantic slide hosts. */
+const SCALED_SLIDE_MIN_RATIO = 0.4;
+/** Maximum relative distortion and sibling-size variance for thumbnail hosts. */
+const SCALED_SLIDE_TOLERANCE = 0.08;
 const SLIDE_MIN_MATCHES = 2;
-/** Stacked deck hosts with nearly identical rects are considered co-located within this tolerance. */
-const STACKED_RECT_TOLERANCE_PX = 5;
 /** Class names tried first when inferring active-gated deck toggles. */
 const ACTIVE_DECK_CLASS_CANDIDATES = [
   'active',
@@ -119,10 +152,14 @@ const ACTIVE_DECK_CLASS_CANDIDATES = [
 export const SLIDE_PROBE_RULES: SlideProbeRule[] = [
   { label: '.slide-container', selector: '.slide-container' },
   { label: '.slide-wrap', selector: '.slide-wrap' },
-  { label: 'section[class*="slide"]', selector: 'section[class*="slide"]' },
-  { label: '.slide', selector: '.slide' },
-  { label: '[data-slide]', selector: '[data-slide]' },
-  { label: 'section.slide', selector: 'section.slide' },
+  {
+    label: 'section[class*="slide"]',
+    selector: 'section[class*="slide"]',
+    allowScaledViewportHosts: true,
+  },
+  { label: '.slide', selector: '.slide', allowScaledViewportHosts: true },
+  { label: '[data-slide]', selector: '[data-slide]', allowScaledViewportHosts: true },
+  { label: 'section.slide', selector: 'section.slide', allowScaledViewportHosts: true },
   {
     // Covers conventions such as .slide-deck, .slide_page, .deck-slide, and
     // .slideDeck without matching unrelated .slideshow / .slider classes.
@@ -131,6 +168,22 @@ export const SLIDE_PROBE_RULES: SlideProbeRule[] = [
     selector: '[class]',
     classTokenPattern: '^(?:slide(?:[-_][\\w-]+|[A-Z][\\w-]*)?|[\\w-]+[-_]slide)$',
     requireMeaningfulContent: true,
+    allowScaledViewportHosts: true,
+  },
+  // Active-gated decks that name hosts `.page` / data-page (common in
+  // education iframes). requireMeaningfulContent enables the display:none
+  // sibling relaxation; exact `.page` avoids `.page-header` / `.page-title`.
+  {
+    label: '[data-page]',
+    selector: '[data-page]',
+    requireMeaningfulContent: true,
+    allowScaledViewportHosts: true,
+  },
+  {
+    label: '.page',
+    selector: '.page',
+    requireMeaningfulContent: true,
+    allowScaledViewportHosts: true,
   },
   {
     label: 'section',
@@ -145,6 +198,11 @@ export class ElementInspector {
 
   constructor(page: Page) {
     this.page = page;
+  }
+
+  /** Playwright page this inspector is bound to (outer HTML or promoted iframe doc). */
+  get boundPage(): Page {
+    return this.page;
   }
 
   /**
@@ -379,6 +437,121 @@ export class ElementInspector {
     return this.enrichDiscoveryWithActiveDeck(discovery);
   }
 
+  /**
+   * When the outer document is not itself a multi-slide deck, look for a
+   * near-full-viewport `<iframe>` whose document is. Small embeds stay ordinary
+   * iframe elements (handled later by {@link resolveIframes}).
+   */
+  async tryPromoteLargeIframeDeck(
+    options?: InspectElementsOptions
+  ): Promise<IframeDeckPromotion | null> {
+    const mode = options?.iframes ?? 'inspect';
+    if (mode !== 'inspect') return null;
+
+    const slideWidth = getSlideWidthPx();
+    const slideHeight = getSlideHeightPx();
+    const minW = slideWidth * SLIDE_WIDTH_MIN_RATIO;
+    const minH = slideHeight * SLIDE_HEIGHT_MIN_RATIO;
+    const maxH = slideHeight * SLIDE_HEIGHT_MAX_RATIO;
+
+    const candidates = await this.page.evaluate(
+      ({ minW, minH, maxH }) => {
+        return Array.from(document.querySelectorAll('iframe')).flatMap((el, index) => {
+          if (!(el instanceof HTMLIFrameElement)) return [];
+          const rect = el.getBoundingClientRect();
+          if (
+            rect.width < minW ||
+            rect.height < minH ||
+            rect.height > maxH ||
+            rect.width <= 0 ||
+            rect.height <= 0
+          ) {
+            return [];
+          }
+          const id = `iframe-deck-${index}-${Math.random().toString(36).slice(2, 8)}`;
+          el.setAttribute('data-deckhtml-iframe', id);
+          const contentW = Math.max(
+            1,
+            Math.round(el.offsetWidth || el.clientWidth || rect.width)
+          );
+          const contentH = Math.max(
+            1,
+            Math.round(el.offsetHeight || el.clientHeight || rect.height)
+          );
+          return [
+            {
+              iframeSelector: `[data-deckhtml-iframe="${id}"]`,
+              iframeSrc: el.src || el.getAttribute('src') || undefined,
+              iframeSrcdoc: el.getAttribute('srcdoc') || undefined,
+              iframeBaseUrl: document.baseURI || location.href,
+              iframeContentWidth: contentW,
+              iframeContentHeight: contentH,
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              x: Math.round(rect.left),
+              y: Math.round(rect.top),
+            },
+          ];
+        });
+      },
+      { minW, minH, maxH }
+    );
+
+    if (candidates.length === 0) return null;
+
+    for (const candidate of candidates) {
+      const placeholder: ElementInfo = {
+        type: 'iframe',
+        tag: 'iframe',
+        x: candidate.x,
+        y: candidate.y,
+        width: candidate.width,
+        height: candidate.height,
+        styles: {},
+        iframeSrc: candidate.iframeSrc,
+        iframeSrcdoc: candidate.iframeSrcdoc,
+        iframeSelector: candidate.iframeSelector,
+        iframeContentWidth: candidate.iframeContentWidth,
+        iframeContentHeight: candidate.iframeContentHeight,
+        iframeBaseUrl: candidate.iframeBaseUrl,
+      };
+
+      let childPage: Page | null = null;
+      try {
+        childPage = await this.openIframeDocumentPage(placeholder, options);
+        const childInspector = new ElementInspector(childPage);
+        const discovery = await childInspector.discoverSlideContainers(
+          undefined,
+          true
+        );
+        if (discovery.count < SLIDE_MIN_MATCHES) {
+          await childPage.close().catch(() => {});
+          childPage = null;
+          continue;
+        }
+
+        const rule = discovery.rule
+          ? `iframe→${discovery.rule}`
+          : 'iframe→auto';
+        return {
+          discovery: { ...discovery, rule },
+          inspector: childInspector,
+          dispose: async () => {
+            await childPage?.close().catch(() => {});
+          },
+        };
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `⚠️  Large iframe deck probe failed, keeping as embedded iframe: ${reason}`
+        );
+        if (childPage) await childPage.close().catch(() => {});
+      }
+    }
+
+    return null;
+  }
+
   /** Attach active-gated deck metadata when tagged slide hosts match deck heuristics. */
   private async enrichDiscoveryWithActiveDeck(
     discovery: SlideContainerDiscovery
@@ -460,6 +633,7 @@ export class ElementInspector {
     const maxH = slideHeight * SLIDE_HEIGHT_MAX_RATIO;
     const minW = slideWidth * SLIDE_WIDTH_MIN_RATIO;
     const expandSiblingHosts = probeRule.expandSiblingHosts === true;
+    const allowScaledViewportHosts = probeRule.allowScaledViewportHosts === true;
 
     return this.page.evaluate(
       ({
@@ -471,6 +645,11 @@ export class ElementInspector {
         minW,
         expandSiblingHosts,
         requireMeaningfulContent,
+        allowScaledViewportHosts,
+        slideHeight,
+        slideWidth,
+        scaledMinRatio,
+        scaledTolerance,
       }) => {
         const sortDocumentOrder = (a: Element, b: Element): number => {
           const pos = a.compareDocumentPosition(b);
@@ -482,6 +661,42 @@ export class ElementInspector {
         const qualifiesSize = (el: Element): boolean => {
           const rect = el.getBoundingClientRect();
           return rect.height >= minH && rect.height <= maxH && rect.width >= minW;
+        };
+
+        const scaledRect = (el: Element): DOMRect | null => {
+          if (!allowScaledViewportHosts) return null;
+          const rect = el.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0 || rect.height > maxH) return null;
+          const scaleX = rect.width / slideWidth;
+          const scaleY = rect.height / slideHeight;
+          if (scaleX < scaledMinRatio || scaleY < scaledMinRatio) return null;
+          const distortion = Math.abs(scaleX - scaleY) / Math.max(scaleX, scaleY);
+          return distortion <= scaledTolerance ? rect : null;
+        };
+
+        const getScaledSiblingDeck = (): Set<Element> => {
+          if (!allowScaledViewportHosts || candidates.length < 2) return new Set();
+          const candidatesByParent = new Map<Element, Array<{ candidate: Element; rect: DOMRect }>>();
+          for (const candidate of candidates) {
+            const parent = candidate.parentElement;
+            const rect = scaledRect(candidate);
+            if (!parent || !rect) continue;
+            const siblings = candidatesByParent.get(parent) ?? [];
+            siblings.push({ candidate, rect });
+            candidatesByParent.set(parent, siblings);
+          }
+
+          const accepted = new Set<Element>();
+          for (const siblings of candidatesByParent.values()) {
+            if (siblings.length < 2) continue;
+            const reference = siblings[0].rect;
+            const consistent = siblings.every(({ rect }) =>
+              Math.abs(rect.width - reference.width) / Math.max(rect.width, reference.width) <= scaledTolerance &&
+              Math.abs(rect.height - reference.height) / Math.max(rect.height, reference.height) <= scaledTolerance
+            );
+            if (consistent) siblings.forEach(({ candidate }) => accepted.add(candidate));
+          }
+          return accepted;
         };
 
         const hasMeaningfulContent = (el: Element): boolean => {
@@ -513,11 +728,51 @@ export class ElementInspector {
 
         let qualified: Element[];
 
+        const getActiveGatedSiblingDeck = (): Set<Element> => {
+          // Hidden pages have zero rects, so only relax the geometry gate for the
+          // narrow, explicit convention of meaningful semantic slide siblings where
+          // one page is displayed and all peers are display:none.
+          if (!requireMeaningfulContent || candidates.length < 2) return new Set();
+          const candidatesByParent = new Map<Element, Element[]>();
+          for (const candidate of candidates) {
+            const parent = candidate.parentElement;
+            if (!parent) continue;
+            const siblings = candidatesByParent.get(parent) ?? [];
+            siblings.push(candidate);
+            candidatesByParent.set(parent, siblings);
+          }
+
+          for (const siblings of candidatesByParent.values()) {
+            if (siblings.length < 2 || !siblings.every(hasMeaningfulContent)) continue;
+            const visible = siblings.filter((candidate) => {
+              const style = window.getComputedStyle(candidate);
+              const opacity = parseFloat(style.opacity);
+              return (
+                style.display !== 'none' &&
+                style.visibility !== 'hidden' &&
+                (Number.isNaN(opacity) || opacity > 0.01)
+              );
+            });
+            if (visible.length !== 1) continue;
+            if (!siblings.filter((candidate) => candidate !== visible[0]).every(
+              (candidate) => window.getComputedStyle(candidate).display === 'none'
+            )) continue;
+            if (Array.from(visible[0].classList).some((className) =>
+              siblings.every((candidate) => candidate === visible[0] || !candidate.classList.contains(className))
+            )) return new Set(siblings);
+          }
+          return new Set();
+        };
+
         if (!expandSiblingHosts) {
+          const activeGatedSiblingDeck = getActiveGatedSiblingDeck();
+          const scaledSiblingDeck = getScaledSiblingDeck();
           qualified = candidates
             .filter(
               (candidate) =>
-                qualifiesSize(candidate) &&
+                (activeGatedSiblingDeck.has(candidate) ||
+                  qualifiesSize(candidate) ||
+                  scaledSiblingDeck.has(candidate)) &&
                 (!requireMeaningfulContent || hasMeaningfulContent(candidate))
             )
             .sort(sortDocumentOrder);
@@ -573,6 +828,11 @@ export class ElementInspector {
         minW,
         expandSiblingHosts,
         requireMeaningfulContent: probeRule.requireMeaningfulContent === true,
+        allowScaledViewportHosts,
+        slideHeight,
+        slideWidth,
+        scaledMinRatio: SCALED_SLIDE_MIN_RATIO,
+        scaledTolerance: SCALED_SLIDE_TOLERANCE,
       }
     );
   }
@@ -594,7 +854,7 @@ export class ElementInspector {
    */
   private async detectActiveGatedDeck(): Promise<ActiveGatedDeckInfo | undefined> {
     return this.page.evaluate(
-      ({ indexAttr, classCandidates, rectTolerance }) => {
+      ({ indexAttr, classCandidates }) => {
         const hosts = Array.from(document.querySelectorAll(`[${indexAttr}]`));
         if (hosts.length < 2) return undefined;
 
@@ -603,35 +863,27 @@ export class ElementInspector {
           return undefined;
         }
 
-        const isStackedHost = (host: Element): boolean => {
-          const style = window.getComputedStyle(host);
-          if (style.position !== 'absolute' && style.position !== 'fixed') {
-            return false;
-          }
-          if (!(host instanceof HTMLElement)) return false;
-          const first = hosts[0];
-          if (!(first instanceof HTMLElement)) return false;
-          // Use layout dimensions — inactive slides may be offset by CSS transform.
-          return (
-            Math.abs(host.offsetWidth - first.offsetWidth) <= rectTolerance &&
-            Math.abs(host.offsetHeight - first.offsetHeight) <= rectTolerance
-          );
-        };
-
-        if (!hosts.every(isStackedHost)) return undefined;
-
         const isVisible = (host: Element): boolean => {
           const style = window.getComputedStyle(host);
           const opacity = parseFloat(style.opacity);
-          return style.visibility !== 'hidden' && !Number.isNaN(opacity) && opacity > 0.01;
+          return (
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            (Number.isNaN(opacity) || opacity > 0.01)
+          );
         };
 
         const visibleHosts = hosts.filter(isVisible);
         if (visibleHosts.length !== 1) return undefined;
 
+        // This deliberately requires display:none on every inactive sibling. It
+        // supports ordinary-flow sidebar decks while avoiding generic tab/widget
+        // collections that merely differ in opacity or position.
         const visible = visibleHosts[0];
         const hidden = hosts.find((host) => host !== visible);
-        if (!hidden) return undefined;
+        if (!hidden || !hosts.filter((host) => host !== visible).every(
+          (host) => window.getComputedStyle(host).display === 'none'
+        )) return undefined;
 
         const inferActiveClass = (): string | undefined => {
           for (const className of classCandidates) {
@@ -653,7 +905,6 @@ export class ElementInspector {
       {
         indexAttr: SLIDE_INDEX_ATTR,
         classCandidates: ACTIVE_DECK_CLASS_CANDIDATES,
-        rectTolerance: STACKED_RECT_TOLERANCE_PX,
       }
     );
   }
@@ -772,8 +1023,181 @@ export class ElementInspector {
     );
     await this.captureCssAnimations(slideSelector);
     await this.prepareSlideContainerForInspect(slideSelector, discovery);
+    await this.expandIsolatedSlideHostToDesignCanvas(slideSelector);
     await this.waitForLayoutSettle();
     await this.waitForSlideAnimationSettle();
+  }
+
+  /**
+   * Preview chrome often mounts slide hosts as proportional thumbnails of a larger
+   * design canvas (e.g. 1920×1080 content scaled via `--deck-scale` into a ~622×350
+   * stage). Expand the isolated host to that design size, pin it to the viewport
+   * origin, and resize Playwright + px→inch mapping so inspect measures full-bleed
+   * slide geometry instead of the chrome thumbnail.
+   */
+  private async expandIsolatedSlideHostToDesignCanvas(
+    slideSelector: string
+  ): Promise<{ width: number; height: number } | null> {
+    const targetW = getSlideWidthPx();
+    const targetH = getSlideHeightPx();
+
+    const design = await this.page.evaluate(
+      ({ sel, targetW, targetH, scaledTolerance }) => {
+        const host = document.querySelector(sel);
+        if (!(host instanceof HTMLElement)) return null;
+
+        const hostRect = host.getBoundingClientRect();
+        if (hostRect.width <= 0 || hostRect.height <= 0) return null;
+
+        const resolveDesignSize = (): { width: number; height: number } | null => {
+          // Prefer unscaled layout boxes inside the host (transform scale shrinks paint).
+          const candidates = [
+            host.querySelector('.imported-theme-root'),
+            ...Array.from(host.children),
+          ].filter((node): node is HTMLElement => node instanceof HTMLElement);
+
+          for (const el of candidates) {
+            const layoutW = el.offsetWidth;
+            const layoutH = el.offsetHeight;
+            const painted = el.getBoundingClientRect();
+            if (
+              layoutW >= targetW * 0.9 &&
+              layoutH >= targetH * 0.9 &&
+              (layoutW > painted.width * 1.05 || layoutH > painted.height * 1.05)
+            ) {
+              return { width: Math.round(layoutW), height: Math.round(layoutH) };
+            }
+          }
+
+          const scaleRaw = getComputedStyle(document.documentElement)
+            .getPropertyValue('--deck-scale')
+            .trim();
+          const scale = parseFloat(scaleRaw);
+          if (Number.isFinite(scale) && scale > 0.05 && scale < 0.999) {
+            return {
+              width: Math.round(hostRect.width / scale),
+              height: Math.round(hostRect.height / scale),
+            };
+          }
+
+          // Host itself is a proportional thumbnail of the conversion viewport.
+          const scaleX = hostRect.width / targetW;
+          const scaleY = hostRect.height / targetH;
+          if (
+            scaleX > 0.05 &&
+            scaleX < 0.95 &&
+            Math.abs(scaleX - scaleY) / Math.max(scaleX, scaleY) <= scaledTolerance
+          ) {
+            return { width: targetW, height: targetH };
+          }
+
+          return null;
+        };
+
+        const next = resolveDesignSize();
+        if (!next) return null;
+        if (
+          Math.abs(hostRect.width - next.width) <= 2 &&
+          Math.abs(hostRect.height - next.height) <= 2
+        ) {
+          return null;
+        }
+
+        const { width: tw, height: th } = next;
+
+        // Preview layout hooks re-shrink the stage on resize; disable while inspecting.
+        try {
+          (window as any).__layoutDeck = () => {};
+        } catch {
+          // ignore
+        }
+
+        document.body?.classList.remove('preview-panel-open');
+        document.body?.classList.add('editor-panels-collapsed');
+        document.body?.setAttribute('data-mode', 'present');
+
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty('--deck-w', `${tw}px`);
+        rootStyle.setProperty('--deck-h', `${th}px`);
+        rootStyle.setProperty('--deck-left', '0px');
+        rootStyle.setProperty('--deck-top', '0px');
+        rootStyle.setProperty('--deck-scale', '1');
+
+        const pinFullBleed = (el: Element | null) => {
+          if (!(el instanceof HTMLElement || el instanceof SVGElement)) return;
+          const style = (el as HTMLElement).style;
+          style.setProperty('position', 'fixed', 'important');
+          style.setProperty('left', '0', 'important');
+          style.setProperty('top', '0', 'important');
+          style.setProperty('right', 'auto', 'important');
+          style.setProperty('bottom', 'auto', 'important');
+          style.setProperty('width', `${tw}px`, 'important');
+          style.setProperty('height', `${th}px`, 'important');
+          style.setProperty('max-width', 'none', 'important');
+          style.setProperty('max-height', 'none', 'important');
+          style.setProperty('margin', '0', 'important');
+          style.setProperty('transform', 'none', 'important');
+          style.setProperty('zoom', '1', 'important');
+        };
+
+        let cur: HTMLElement | null = host;
+        while (cur && cur !== document.body && cur !== document.documentElement) {
+          pinFullBleed(cur);
+          cur = cur.parentElement;
+        }
+
+        const parent = host.parentElement;
+        if (parent) {
+          parent.style.setProperty('display', 'block', 'important');
+          for (const sibling of Array.from(parent.children)) {
+            if (sibling === host || !(sibling instanceof HTMLElement)) continue;
+            sibling.style.setProperty('display', 'none', 'important');
+          }
+        }
+
+        host.querySelectorAll('.imported-theme-root').forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          el.style.setProperty('transform', 'none', 'important');
+          el.style.setProperty('width', `${tw}px`, 'important');
+          el.style.setProperty('height', `${th}px`, 'important');
+        });
+
+        host.classList.add('active');
+        host.style.setProperty('content-visibility', 'visible', 'important');
+        host.setAttribute('data-deck-active', '');
+        try {
+          const ensure =
+            (window as any).__ensureRuntimeSlideRendered ||
+            (window as any).__prepareSlideForTransition;
+          if (typeof ensure === 'function') {
+            ensure(host, undefined, { isolated: true, context: 'deckhtml-expand' });
+          }
+          (window as any).__startTransitionSlideEnter?.(host);
+          (window as any).__syncActiveEffects?.(host);
+        } catch {
+          // ignore
+        }
+
+        window.scrollTo(0, 0);
+        return next;
+      },
+      {
+        sel: slideSelector,
+        targetW,
+        targetH,
+        scaledTolerance: SCALED_SLIDE_TOLERANCE,
+      }
+    );
+
+    if (!design) return null;
+
+    await this.page.setViewportSize({
+      width: design.width,
+      height: design.height,
+    });
+    setViewportPixels(design.width, design.height);
+    await this.waitForLayoutSettle();
+    return design;
   }
 
   /**
@@ -1253,6 +1677,31 @@ export class ElementInspector {
             }
             host.classList.add(activeClass);
           }
+        } else {
+          // Horizontal preview decks keep several slides painted; still promote the
+          // isolated host so content-visibility / theme scripts treat it as current.
+          host.classList.add('active');
+          host.classList.remove('cv-near');
+        }
+
+        host.style.setProperty('content-visibility', 'visible', 'important');
+        host.style.setProperty('contain-intrinsic-size', 'none', 'important');
+        host.setAttribute('data-deck-active', '');
+
+        // Deck players often keep only the active page fully mounted; force-render
+        // the isolated host before measuring (lazy theme roots / content-visibility).
+        try {
+          const ensure =
+            (window as any).__ensureRuntimeSlideRendered ||
+            (window as any).__prepareSlideForTransition;
+          if (typeof ensure === 'function') {
+            ensure(host, undefined, { isolated: true, context: 'deckhtml' });
+          }
+          (window as any).__startTransitionSlideEnter?.(host);
+          (window as any).__syncActiveEffects?.(host);
+          (window as any).__restoreEffectIframes?.(host);
+        } catch {
+          // Best-effort only; static markup still inspects without runtime helpers.
         }
 
         host.scrollIntoView({ block: 'start', inline: 'nearest' });
@@ -1353,7 +1802,10 @@ export class ElementInspector {
         ) ?? document.querySelectorAll(selector)[slideIndex];
         if (!node) return { x: 0, y: 0 };
         const rect = node.getBoundingClientRect();
-        return { x: 0, y: rect.top };
+        // Map slide-local coordinates so the isolated host's top-left becomes (0,0).
+        // Preview chrome / horizontal strips often leave a non-zero left/top until
+        // expandIsolatedSlideHostToDesignCanvas pins the host full-bleed.
+        return { x: rect.left, y: rect.top };
       },
       { slideIndex, selector, indexAttr: SLIDE_INDEX_ATTR }
     );
@@ -1363,8 +1815,9 @@ export class ElementInspector {
     elements: ElementInfo[],
     origin: { x: number; y: number }
   ): void {
-    if (origin.y === 0) return;
+    if (origin.x === 0 && origin.y === 0) return;
     for (const el of elements) {
+      el.x -= origin.x;
       el.y -= origin.y;
     }
   }
@@ -6795,6 +7248,37 @@ export class ElementInspector {
     placeholder: ElementInfo,
     options?: InspectElementsOptions
   ): Promise<ElementInfo[]> {
+    const scale =
+      typeof placeholder.iframeScale === 'number' &&
+      !Number.isNaN(placeholder.iframeScale) &&
+      placeholder.iframeScale > 0
+        ? placeholder.iframeScale
+        : 1;
+    const childPage = await this.openIframeDocumentPage(placeholder, options);
+
+    try {
+      const childInspector = new ElementInspector(childPage);
+      const childElements = await childInspector.inspectElements(undefined, {
+        ...options,
+        inputIsSvg: false,
+        // Nested resolveIframes runs inside this call via iframeDepth.
+      });
+
+      this.offsetIframeElements(childElements, placeholder.x, placeholder.y, scale);
+      return childElements;
+    } finally {
+      await childPage.close().catch(() => {});
+    }
+  }
+
+  /**
+   * Load an iframe's src/srcdoc into a new Playwright page sized to the iframe box.
+   * Caller owns the returned page and must close it.
+   */
+  private async openIframeDocumentPage(
+    placeholder: ElementInfo,
+    options?: InspectElementsOptions
+  ): Promise<Page> {
     const contentW = Math.max(
       1,
       Math.round(placeholder.iframeContentWidth || placeholder.width || 1)
@@ -6803,12 +7287,6 @@ export class ElementInspector {
       1,
       Math.round(placeholder.iframeContentHeight || placeholder.height || 1)
     );
-    const scale =
-      typeof placeholder.iframeScale === 'number' &&
-      !Number.isNaN(placeholder.iframeScale) &&
-      placeholder.iframeScale > 0
-        ? placeholder.iframeScale
-        : 1;
     const timeoutMs = options?.iframeLoadTimeoutMs ?? DEFAULT_IFRAME_LOAD_TIMEOUT_MS;
     const context = this.page.context();
     const childPage = await context.newPage();
@@ -6876,17 +7354,10 @@ export class ElementInspector {
         await childPage.waitForTimeout(500);
       }
 
-      const childInspector = new ElementInspector(childPage);
-      const childElements = await childInspector.inspectElements(undefined, {
-        ...options,
-        inputIsSvg: false,
-        // Nested resolveIframes runs inside this call via iframeDepth.
-      });
-
-      this.offsetIframeElements(childElements, placeholder.x, placeholder.y, scale);
-      return childElements;
-    } finally {
+      return childPage;
+    } catch (err) {
       await childPage.close().catch(() => {});
+      throw err;
     }
   }
 

@@ -43,13 +43,20 @@ export async function inspectSlidesParallel(
     );
     try {
       const inspector = new ElementInspector(page);
-      await inspector.discoverSlideContainers(
+      // Reuse discovery rules per worker so its data attributes and active-deck
+      // metadata always refer to this page's DOM, not the coordinator page.
+      const workerDiscovery = await inspector.discoverSlideContainers(
         params.slideSelector,
         params.autoDetectSlides
       );
+      if (workerDiscovery.count !== params.discovery.count) {
+        throw new Error(
+          `Parallel slide discovery mismatch: expected ${params.discovery.count}, got ${workerDiscovery.count}`
+        );
+      }
       const elements = await inspector.inspectOneSlideIsolated(
         slideIndex,
-        params.discovery,
+        workerDiscovery,
         params.inspectOptions
       );
       slidesMap.set(slideIndex, elements);

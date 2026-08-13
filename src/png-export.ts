@@ -88,15 +88,39 @@ async function exportSingleInputToPng(
     allowLocalResources: options.allowLocalResources ?? true,
   });
 
+  let iframeDeckDispose: (() => Promise<void>) | undefined;
   try {
-    const inspector = new ElementInspector(page);
+    let inspector = new ElementInspector(page);
     const autoDetect = options.autoDetectSlides !== false;
-    const discovery = await inspector.discoverSlideContainers(
+    let discovery = await inspector.discoverSlideContainers(
       options.slideSelector,
       autoDetect
     );
+
+    // Match PPTX: when the outer shell is not multi-slide, promote a near-full-viewport
+    // iframe whose document is (e.g. education decks with srcdoc + .page[data-page]).
+    if (
+      discovery.count < 2 &&
+      autoDetect &&
+      !options.slideSelector?.trim() &&
+      (options.iframes ?? 'inspect') === 'inspect'
+    ) {
+      const promoted = await inspector.tryPromoteLargeIframeDeck({
+        iframes: options.iframes,
+        iframeLoadTimeoutMs: options.iframeLoadTimeoutMs,
+        allowLocalResources: options.allowLocalResources,
+        resourcePolicy: options.resourcePolicy,
+      });
+      if (promoted) {
+        discovery = promoted.discovery;
+        inspector = promoted.inspector;
+        iframeDeckDispose = promoted.dispose;
+      }
+    }
+
+    const capturePage = inspector.boundPage;
     const splitByHeight = Boolean(options.splitByHeight);
-    const scrollHeight = await getDocumentScrollHeight(page);
+    const scrollHeight = await getDocumentScrollHeight(capturePage);
 
     if (needsPerSlideCapture(discovery, splitByHeight, scrollHeight, viewport.height)) {
       const images: Buffer[] = [];
@@ -117,7 +141,11 @@ async function exportSingleInputToPng(
               slideSelector
             );
             images.push(
-              await captureViewportPng(page, viewport, captureSelector ?? slideSelector)
+              await captureViewportPng(
+                capturePage,
+                viewport,
+                captureSelector ?? slideSelector
+              )
             );
           } finally {
             await inspector.restoreRasterExportFrame();
@@ -135,7 +163,7 @@ async function exportSingleInputToPng(
         await inspector.applyViewportClipForRaster(i * viewport.height, viewport);
         try {
           const captureSelector = await inspector.applyRasterExportFrame(viewport);
-          images.push(await captureViewportPng(page, viewport, captureSelector));
+          images.push(await captureViewportPng(capturePage, viewport, captureSelector));
         } finally {
           await inspector.restoreViewportClipForRaster();
         }
@@ -147,8 +175,9 @@ async function exportSingleInputToPng(
       console.error('🖼  PNG export: single page');
     }
     const captureSelector = await inspector.applyRasterExportFrame(viewport);
-    return [await captureViewportPng(page, viewport, captureSelector)];
+    return [await captureViewportPng(capturePage, viewport, captureSelector)];
   } finally {
+    await iframeDeckDispose?.().catch(() => {});
     await page.evaluate(
       (ids) => {
         for (const id of ids) {
@@ -156,7 +185,7 @@ async function exportSingleInputToPng(
         }
       },
       ['deckhtml-raster-clip-style', 'deckhtml-raster-frame-style']
-    );
+    ).catch(() => {});
     await loader.close().catch(() => {});
   }
 }
