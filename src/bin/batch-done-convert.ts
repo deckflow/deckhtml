@@ -5,13 +5,14 @@
  * into a single out.pptx in that directory.
  *
  * Usage:
- *   ./src/bin/batch-done-convert.ts [dir] [local] [1280x720]
+ *   ./src/bin/batch-done-convert.ts [dir] [local] [WxH]
  *
  * Examples:
  *   ./src/bin/batch-done-convert.ts                    # all dirs under benchmark/done
  *   ./src/bin/batch-done-convert.ts local              # all dirs, allow file://
  *   ./src/bin/batch-done-convert.ts benchmark/done/0001
  *   ./src/bin/batch-done-convert.ts 0001 local
+ *   ./src/bin/batch-done-convert.ts 0019 1920x1080     # force viewport; omit WxH for auto-detect
  */
 
 import { existsSync, readdirSync, statSync, writeFileSync } from 'fs';
@@ -23,11 +24,11 @@ const DONE_ROOT = resolve(root, 'benchmark/done');
 
 interface ConvertOptions {
   allowLocalResources: boolean;
-  viewport: { width: number; height: number };
+  /** Explicit viewport; omit to auto-detect from each HTML (same as CLI). */
+  viewport?: { width: number; height: number };
 }
 
-function parseViewportArg(arg: string | undefined): { width: number; height: number } {
-  if (!arg) return { width: 1280, height: 720 };
+function parseViewportArg(arg: string): { width: number; height: number } {
   const match = arg.match(/^(\d+)x(\d+)$/i);
   if (!match) {
     throw new Error(`Invalid viewport: ${arg}. Expected WxH e.g. 1280x720`);
@@ -83,7 +84,7 @@ function parseArgs(argv: string[]): { dirArg?: string; options: ConvertOptions }
     dirArg,
     options: {
       allowLocalResources: args.includes('local'),
-      viewport: parseViewportArg(viewportArg),
+      viewport: viewportArg ? parseViewportArg(viewportArg) : undefined,
     },
   };
 }
@@ -106,7 +107,11 @@ async function convertDoneDir(dirArg: string, options: ConvertOptions): Promise<
     console.log(`  ${String(i + 1).padStart(3, ' ')}. ${path.basename(file)}`);
   });
   console.log(`Output:    ${outputPath}`);
-  console.log(`Viewport:  ${viewport.width}×${viewport.height}px`);
+  console.log(
+    viewport
+      ? `Viewport:  ${viewport.width}×${viewport.height}px`
+      : 'Viewport:  auto-detect per HTML (deck-size / CSS / body size, else 1280×720)'
+  );
   if (allowLocalResources) console.log('Local resources: allowed');
   console.log('');
 
@@ -115,8 +120,9 @@ async function convertDoneDir(dirArg: string, options: ConvertOptions): Promise<
 
   const result = await convertHtmlToPptx({
     inputs: htmlFiles,
-    viewportWidth: viewport.width,
-    viewportHeight: viewport.height,
+    ...(viewport
+      ? { viewportWidth: viewport.width, viewportHeight: viewport.height }
+      : {}),
     allowLocalResources,
   });
 
@@ -128,11 +134,11 @@ async function convertDoneDir(dirArg: string, options: ConvertOptions): Promise<
 
 function printUsage(): void {
   console.log(
-    'Usage: ./src/bin/batch-done-convert.ts [dir] [local] [1280x720]\n' +
+    'Usage: ./src/bin/batch-done-convert.ts [dir] [local] [WxH]\n' +
       '  [dir]   Optional. Path under benchmark/done (e.g. 0001) or absolute path.\n' +
       '          Omit to convert every subdirectory under benchmark/done in order.\n' +
       '  local   Allow file:// subresources\n' +
-      '  WxH     Viewport size, default 1280x720\n' +
+      '  WxH     Optional force viewport (e.g. 1920x1080). Omit to auto-detect per HTML\n' +
       '\n' +
       'All .html files in each directory are merged in name order into out.pptx.'
   );
