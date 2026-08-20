@@ -121,6 +121,14 @@ export class Config {
     await this.save();
   }
 
+  /** Drop stored auth secrets so subsequent runs behave as unauthenticated. */
+  async clearAuth(): Promise<void> {
+    delete this.data.apiKey;
+    delete this.data.token;
+    delete this.data.spaceId;
+    await this.save();
+  }
+
   isConfigured(): boolean {
     return Boolean(this.data.apiKey || this.data.token);
   }

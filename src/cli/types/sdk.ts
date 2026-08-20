@@ -24,6 +24,7 @@ export interface DeckClient {
     ): Promise<DeckTask>;
     down(taskId: string): Promise<unknown>;
   };
-  setToken(token: string): void;
+  setToken(token: string | undefined): void;
+  setApiKey(apiKey: string | undefined): void;
   setSpaceId(spaceId: string | undefined): void;
 }

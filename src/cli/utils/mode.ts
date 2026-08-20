@@ -8,7 +8,8 @@ export function resolveMode(
   if (requested === 'local') return 'local';
   // Cloud mode no longer requires credentials up front: the SDK always sends
   // X-Auth-UUID and the server treats UUID-only requests as rate-limited
-  // guests. A 401 response triggers the login / API-key guidance flow.
+  // guests. Invalid/expired token or API key are discarded and treated as
+  // absent (guest). A subsequent 401 triggers the login / API-key guidance flow.
   if (requested === 'cloud') return 'cloud';
   return hasCredentials ? 'cloud' : 'local';
 }

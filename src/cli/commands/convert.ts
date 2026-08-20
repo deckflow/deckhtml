@@ -9,6 +9,7 @@ import {
 } from '../../utils/platformFontMap';
 import { buildPngOutputPaths } from '../../utils/png-output-path';
 import { Context } from '../context';
+import { DEFAULT_PORT } from '../core/auth';
 import {
   deriveOutputPath,
   materializeInputs,
@@ -47,6 +48,33 @@ const DEFAULT_TIMEOUT = 600;
 
 const VALID_PLATFORMS = ['win', 'mac', 'ios', 'android', 'linux'] as const;
 type CloudPlatform = 'mac' | 'win';
+
+function isUnauthorizedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const status = (error as { statusCode?: unknown }).statusCode;
+  if (status === 401) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b401\b/.test(message) || /unauthorized/i.test(message);
+}
+
+/** 403 when a stale user spaceId is sent after auth downgrade to guest. */
+function isStaleSpaceAccessError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const status = (error as { statusCode?: unknown }).statusCode;
+  const message = error instanceof Error ? error.message : String(error);
+  const data = (error as { responseData?: unknown }).responseData;
+  const dataText =
+    typeof data === 'string'
+      ? data
+      : data !== undefined
+        ? JSON.stringify(data)
+        : '';
+  const text = `${message}\n${dataText}`;
+  if (status !== 403 && !/\b403\b/.test(message)) {
+    return false;
+  }
+  return /only operate your own data/i.test(text);
+}
 
 export interface ConvertOptions {
   output?: string;
@@ -327,20 +355,24 @@ async function runCloudConvert(
   options: ConvertOptions,
   platform: PlatformTarget,
   viewport: { width: number; height: number } | undefined,
-  format: string
+  format: string,
+  allowLoginRetry = true
 ): Promise<ConversionResultEnvelope> {
   if (format === 'pdf') {
     throw new Error('PDF output is not yet supported.');
   }
 
+  const hadCredentials = ctx.hasCredentials();
   const deck = await ctx.getDeck();
-  const spaceId = ctx.config.get('spaceId');
+  // spaceId is tied to an authenticated user; omit it for guest mode so a
+  // stale value cannot leak into create-task after token/api-key expiry.
+  const spaceId = hadCredentials ? ctx.config.get('spaceId') : undefined;
 
   const params = buildCloudParams(options, toCloudPlatform(platform), viewport);
   const taskName = path.basename(inputPaths[0]!, path.extname(inputPaths[0]!));
 
   logVerbose(ctx.verbose, ctx.quiet, `API base: ${ctx.config.apiBase}`);
-  if (!ctx.hasCredentials()) {
+  if (!hadCredentials) {
     logProgress(
       ctx.quiet,
       'Guest mode (X-Auth-UUID only): cloud usage is rate-limited. Run `deckhtml auth login` or `deckhtml config set api-key <key>` for full access.'
@@ -364,16 +396,57 @@ async function runCloudConvert(
     },
   };
 
-  const task =
-    format === 'png'
-      ? await deck.convertHtmlToPng(taskInput)
-      : await deck.convertHtmlToPptx(taskInput);
+  let task: DeckTask;
+  try {
+    task =
+      format === 'png'
+        ? await deck.convertHtmlToPng(taskInput)
+        : await deck.convertHtmlToPptx(taskInput);
+  } catch (error) {
+    // Invalid token/api-key often surfaces as 401 (SDK guest fallback) or 403
+    // when a stale spaceId is still attached to the create payload. Drop auth
+    // and retry once without spaceId; if guest is also blocked, prompt login.
+    if (
+      allowLoginRetry &&
+      hadCredentials &&
+      (isUnauthorizedError(error) || isStaleSpaceAccessError(error))
+    ) {
+      await ctx.discardStoredCredentials();
+      ctx.resetDeck();
+      return runCloudConvert(
+        ctx,
+        inputPaths,
+        outputPath,
+        options,
+        platform,
+        viewport,
+        format,
+        true
+      );
+    }
+    if (allowLoginRetry && isUnauthorizedError(error)) {
+      await ctx.discardStoredCredentials();
+      ctx.resetDeck();
+      await ctx.ensureLoggedIn(DEFAULT_PORT, 'guest-limit');
+      return runCloudConvert(
+        ctx,
+        inputPaths,
+        outputPath,
+        options,
+        platform,
+        viewport,
+        format,
+        false
+      );
+    }
+    throw error;
+  }
 
   logProgress(ctx.quiet, `Task created: ${task.id}`);
 
-  // Guest mode (no token/api-key): the backend parks the task in pending and
-  // waits for an explicit start. If create triggered 401 → login → retry,
-  // credentials are now set and authenticated tasks auto-start.
+  // Guest tasks stay pending until explicit start. Authenticated tasks are
+  // started by the backend — do not call start for them (403 if already started).
+  // Check credentials after create so a mid-request auth downgrade is visible.
   if (!ctx.hasCredentials()) {
     logProgress(ctx.quiet, 'Starting guest task...');
     await deck.tasks.start(task.id);

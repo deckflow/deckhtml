@@ -24,6 +24,8 @@ export class Context {
   private deck?: DeckClient;
   private loginPromise?: Promise<string>;
   private checkoutPromise?: Promise<void>;
+  /** Session flag: treat env/config secrets as absent after a 401 downgrade. */
+  private ignoreStoredCredentials = false;
 
   constructor() {
     this.config = new Config();
@@ -34,17 +36,38 @@ export class Context {
   }
 
   resolveApiKey(): string | undefined {
+    if (this.ignoreStoredCredentials) return undefined;
     return process.env.DECKHTML_API_KEY || this.config.get('apiKey');
   }
 
   hasCredentials(): boolean {
+    if (this.ignoreStoredCredentials) return false;
     return Boolean(this.resolveApiKey() || this.config.get('token'));
+  }
+
+  /**
+   * Treat configured token/api-key as absent after they fail auth.
+   * Also drops spaceId — it belongs to the authenticated user and must not
+   * be sent on guest retries.
+   */
+  async discardStoredCredentials(): Promise<void> {
+    if (this.ignoreStoredCredentials && !this.config.isConfigured()) {
+      this.deck?.setSpaceId(undefined);
+      return;
+    }
+    this.ignoreStoredCredentials = true;
+    await this.config.clearAuth();
+    this.deck?.setSpaceId(undefined);
   }
 
   async getDeck(): Promise<DeckClient> {
     const apiKey = this.resolveApiKey();
-    const token = this.config.get('token');
-    const hadCredentials = Boolean(apiKey || token);
+    const token = this.ignoreStoredCredentials
+      ? undefined
+      : this.config.get('token');
+    const hasAuth = Boolean(apiKey || token);
+    // spaceId is user-scoped; never attach it for guest / discarded-auth clients.
+    const spaceId = hasAuth ? this.config.get('spaceId') : undefined;
 
     if (!this.deck) {
       await installApiErrorCapture({
@@ -55,16 +78,12 @@ export class Context {
         root: this.config.apiBase,
         apiKey,
         token,
-        spaceId: this.config.get('spaceId'),
+        spaceId,
         onUnauthorized: async () => {
-          // Guests (UUID-only) reach here when the server rejects them with
-          // 401 (rate limit or guest access disabled); authenticated users
-          // reach here when their token expired.
-          const nextToken = await this.ensureLoggedIn(
-            DEFAULT_PORT,
-            hadCredentials ? 'unauthorized' : 'guest-limit'
-          );
-          return { token: nextToken, spaceId: this.config.get('spaceId') };
+          // Expired/invalid token: drop stored secrets and fail refresh so the
+          // SDK retries as guest (same as credentials never existing).
+          await this.discardStoredCredentials();
+          throw new Error('Stored credentials are invalid');
         },
         onPaymentRequired: async () => {
           await this.ensureCheckout();
@@ -95,6 +114,7 @@ export class Context {
         reason,
       });
 
+      this.ignoreStoredCredentials = false;
       await this.config.setToken(token);
       if (spaceId) {
         await this.config.setSpaceId(spaceId);
@@ -124,7 +144,7 @@ export class Context {
     this.checkoutPromise = (async () => {
       const token = this.config.get('token');
       if (!token) {
-        await this.ensureLoggedIn(port, 'unauthorized');
+        await this.ensureLoggedIn(port, 'guest-limit');
       }
 
       await runCheckoutFlow({

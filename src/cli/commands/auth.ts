@@ -16,10 +16,10 @@ export function registerAuthCommands(program: Command, ctx: Context): void {
           throw new Error(`Invalid --port: ${options.port}`);
         }
         await ctx.ensureLoggedIn(port, 'explicit');
-        ctx.output(
-          { success: true, message: 'Login successful' },
-          () => 'Login successful'
-        );
+        // Human-readable success is already printed by runLoginFlow.
+        if (ctx.jsonOutput) {
+          ctx.output({ success: true, message: 'Login successful' });
+        }
       } catch (error) {
         ctx.error(error);
       }
