@@ -10,7 +10,7 @@
     "schemas"
   ],
   "bin": {
-    "deckhtml": "./dist/cli.js"
+    "deckhtml": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
