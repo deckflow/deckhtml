@@ -73,7 +73,7 @@ export class Context {
       await installApiErrorCapture({
         logRequests: shouldLogHttpRequests(this.verbose),
       });
-      const { createDeck } = await import('@deckops/sdk');
+      const { createDeck } = await import('@deckflow/decktools-sdk');
       this.deck = createDeck({
         root: this.config.apiBase,
         apiKey,

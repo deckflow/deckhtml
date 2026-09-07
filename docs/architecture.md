@@ -29,7 +29,7 @@ PPTX buffer or PNG frames
 - **Converter (`src/converter.ts`)** — maps inspected element types and CSS-derived properties to PowerPoint text, shapes, tables, media, and images.
 - **Generator (`src/generator.ts`)** — assembles slides with PptxGenJS, applies animation and transition plans, and serializes the presentation.
 - **Enhancers (`src/enhancer/`)** — apply targeted OOXML changes that go beyond PptxGenJS defaults, such as image sizing and table-cell margins.
-- **Cloud SDK integration (`@deckops/sdk`)** — handles authenticated cloud conversion and cloud-only capabilities exposed by the CLI.
+- **Cloud SDK integration (`@deckflow/decktools-sdk`)** — handles authenticated cloud conversion and cloud-only capabilities exposed by the CLI.
 
 ## Conversion flow
 

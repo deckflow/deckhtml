@@ -2,5 +2,5 @@ packages:
   - '.'
 
 minimumReleaseAgeExclude:
-  - '@deckops/sdk@0.7.4'
+  - '@deckflow/decktools-sdk@1.0.0'
   - 'colord@2.9.5'

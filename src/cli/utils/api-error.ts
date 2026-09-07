@@ -148,7 +148,7 @@ export async function installApiErrorCapture(options: {
 } = {}): Promise<void> {
   if (apiErrorPatchInstalled) return;
 
-  const sdk = await import('@deckops/sdk');
+  const sdk = await import('@deckflow/decktools-sdk');
   const APIErrorClass = sdk.APIError as unknown as DeckApiError & {
     fromAxiosError: (error: unknown) => DeckApiError;
   };
