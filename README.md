@@ -10,11 +10,27 @@
 
 **Languages:** **English** · [简体中文](./README.zh-CN.md) · [繁體中文](./README.zh-TW.md) · [Français](./README.fr.md) · [Deutsch](./README.de.md) · [Español](./README.es.md) · [日本語](./README.ja.md) · [한국어](./README.ko.md)
 
-Convert HTML files, stdin, or URLs into PPTX or PNG presentations from your terminal.
+Turn HTML into presentation-ready PPTX or PNG — from files, stdin, or URLs, directly from your terminal.
+
+Build once in HTML, then use the same source across decks, visual assets, and automated presentation workflows.
 
 <p align="center">
   <img src="./assets/screenshots/demo.gif" alt="HTML → PPTX demo" width="600" />
 </p>
+
+## Built for real workflows
+
+DeckHTML fits workflows where content already lives in HTML or can be generated
+by code:
+
+- **Agent-generated presentations** — let coding agents author HTML and produce
+  deliverable PPTX or PNG outputs.
+- **Recurring reports** — turn dashboards, metrics, and templated pages into
+  presentation assets from CI or scheduled jobs.
+- **Web-to-deck reuse** — convert hosted pages or ordered HTML files without
+  rebuilding every slide manually.
+- **Local and cloud execution** — run locally with no API key, or use cloud mode
+  for hosted workflows and cloud-only enhancements.
 
 ## Quick Start
 
