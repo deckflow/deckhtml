@@ -38,6 +38,13 @@ import { verifyOoxml } from './utils/ooxml-verify';
 import { applyAnimationsToElements } from './animation/apply';
 import { resolveConversionViewport } from './utils/viewport';
 import { resolveSlideTransitionPlan } from './slide-transition/resolve';
+import {
+  buildPageDataHtml,
+  countTopLevelSlideHosts,
+  resolvePageDataDeckFromHtml,
+  type PageDataDeck,
+} from './page-data-deck';
+import type { Page } from 'playwright-core';
 
 const ENGINE_VERSION: string = (() => {
   try {
@@ -151,6 +158,85 @@ interface ProcessSingleInputRuntime {
   slideInspectConcurrency?: number;
 }
 
+async function settlePageDataDocument(
+  page: Page,
+  timeoutMs: number
+): Promise<void> {
+  await page
+    .waitForLoadState('networkidle', { timeout: Math.min(timeoutMs, 10_000) })
+    .catch(() => {});
+  await Promise.race([
+    page.evaluate(() => document.fonts.ready),
+    page.waitForTimeout(2000),
+  ]);
+  await page.waitForTimeout(400);
+}
+
+async function inspectPageDataDeck(
+  loader: HTMLLoader,
+  inputPath: string,
+  deck: PageDataDeck,
+  options: ConversionOptions,
+  inspectOptions: {
+    excludeSelector?: string;
+    slideIdAttribute?: string;
+    identityAttribute?: string;
+    identityDiagnostics?: import('./utils/diagnostics').Diagnostic[];
+    excludedCount?: { value: number };
+    iframes?: ConversionOptions['iframes'];
+    iframeLoadTimeoutMs?: number;
+    allowLocalResources?: boolean;
+    resourcePolicy?: ConversionOptions['resourcePolicy'];
+    iframeDiagnostics?: import('./utils/diagnostics').Diagnostic[];
+  }
+): Promise<Map<number, ElementInfo[]>> {
+  const timeoutMs = options.iframeLoadTimeoutMs ?? 8000;
+  const page = await loader.openPreparedPage(inputPath, deck.canvas, {
+    allowLocalResources: options.allowLocalResources,
+    resourcePolicy: options.resourcePolicy,
+  });
+
+  const slidesMap = new Map<number, ElementInfo[]>();
+  try {
+    const baseHref = `file://${inputPath.replace(/\\/g, '/')}`;
+    for (let i = 0; i < deck.pages.length; i++) {
+      const slidePage = deck.pages[i]!;
+      const html = buildPageDataHtml(slidePage, deck.sharedHead, deck.canvas, {
+        baseHref,
+      });
+      await page.setContent(html, {
+        waitUntil: 'domcontentloaded',
+        timeout: timeoutMs,
+      });
+      await settlePageDataDocument(page, timeoutMs);
+
+      const inspector = new ElementInspector(page);
+      const elements = await inspector.inspectElements(undefined, {
+        ...inspectOptions,
+        iframes: inspectOptions.iframes ?? 'inspect',
+      });
+
+      if (elements.length === 0) {
+        elements.push({
+          type: 'text',
+          tag: 'p',
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          styles: {},
+          content: '',
+        });
+      }
+      slidesMap.set(i, elements);
+    }
+  } finally {
+    await page.close().catch(() => {});
+  }
+
+  return slidesMap;
+}
+
 async function processSingleInput(
   loader: HTMLLoader,
   inputPath: string,
@@ -164,6 +250,75 @@ async function processSingleInput(
   const inputIsSvg = inputPath.toLowerCase().endsWith('.svg');
   const viewport = resolveConversionViewport(inputPath, options);
   setViewportPixels(viewport.width, viewport.height);
+
+  const autoDetect = options.autoDetectSlides !== false;
+  const excludedCounter = { value: 0 };
+
+  if (!inputIsSvg && autoDetect && !options.slideSelector?.trim()) {
+    let sourceHtml = '';
+    try {
+      sourceHtml = readFileSync(inputPath, 'utf8');
+    } catch {
+      sourceHtml = '';
+    }
+    const pageDataDeck = sourceHtml
+      ? resolvePageDataDeckFromHtml(sourceHtml, viewport)
+      : null;
+    const canUsePageData =
+      !!pageDataDeck &&
+      (pageDataDeck.source === 'document' ||
+        countTopLevelSlideHosts(sourceHtml) < 2);
+    if (canUsePageData && pageDataDeck) {
+      setViewportPixels(pageDataDeck.canvas.width, pageDataDeck.canvas.height);
+      if (!options.quiet) {
+        console.log(
+          `📑 Page-data deck: ${pageDataDeck.pages.length} pages` +
+            ` (${pageDataDeck.source}, ${pageDataDeck.canvas.width}×${pageDataDeck.canvas.height})`
+        );
+      }
+
+      const inspectOptions = {
+        excludeSelector: options.excludeSelector,
+        slideIdAttribute: options.slideIdAttribute,
+        identityAttribute: options.identityAttribute,
+        identityDiagnostics,
+        excludedCount: excludedCounter,
+        iframes: options.iframes,
+        iframeLoadTimeoutMs: options.iframeLoadTimeoutMs,
+        allowLocalResources: options.allowLocalResources,
+        resourcePolicy: options.resourcePolicy,
+        iframeDiagnostics: identityDiagnostics,
+      };
+
+      const slidesMap = await inspectPageDataDeck(
+        loader,
+        inputPath,
+        pageDataDeck,
+        options,
+        inspectOptions
+      );
+      for (const elements of slidesMap.values()) {
+        collectFontsFromElements(elements, platformFontContext, usedFontsMap);
+      }
+
+      const animationDiagnostics: import('./utils/diagnostics').Diagnostic[] = [];
+      for (const [slideIndex, elements] of slidesMap) {
+        animationDiagnostics.push(
+          ...applyAnimationsToElements(elements, {
+            animationsOption: options.animations,
+            slideId: String(slideIndex + 1),
+          })
+        );
+      }
+
+      return {
+        slidesMap,
+        slideCoordsNormalized: true,
+        excludedCount: excludedCounter.value,
+        animationDiagnostics,
+      };
+    }
+  }
 
   const page = await loader.loadHTML(
     inputPath,
@@ -201,7 +356,6 @@ async function processSingleInput(
     }
 
     let inspector = new ElementInspector(page);
-    const autoDetect = options.autoDetectSlides !== false;
     let discovered = await inspector.discoverSlideContainers(
       options.slideSelector,
       autoDetect
@@ -229,7 +383,6 @@ async function processSingleInput(
 
     let slidesMap: Map<number, ElementInfo[]>;
     let slideCoordsNormalized = false;
-    const excludedCounter = { value: 0 };
 
     try {
     if (discovered.count >= 2) {

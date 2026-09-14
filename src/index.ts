@@ -6,6 +6,13 @@
 export { convertHtmlToPptx, inspectHtmlFonts } from './api';
 export { convertHtmlToPng, type PngConversionResult } from './png-export';
 export { buildPngOutputPaths } from './utils/png-output-path';
+export {
+  extractPageDataDeck,
+  resolvePageDataDeckFromHtml,
+  countPageDataSlides,
+  buildPageDataHtml,
+  DEFAULT_PAGE_DATA_CANVAS,
+} from './page-data-deck';
 export * from './types';
 export {
   listSlideTransitionEffectNames,

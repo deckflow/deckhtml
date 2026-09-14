@@ -3,6 +3,7 @@
  */
 
 import type { Page } from 'playwright-core';
+import { readFileSync } from 'fs';
 import { HTMLLoader } from './loader';
 import {
   ElementInspector,
@@ -17,6 +18,11 @@ import { runQuietly } from './utils/quiet';
 import { EMPTY_CONVERSION_STATS, type ConversionStats } from './conversion-report';
 import type { ConversionOptions } from './types';
 import { resolveConversionViewport } from './utils/viewport';
+import {
+  buildPageDataHtml,
+  countTopLevelSlideHosts,
+  resolvePageDataDeckFromHtml,
+} from './page-data-deck';
 
 export interface PngConversionResult {
   /** One PNG buffer per detected page/slide, in order. */
@@ -76,6 +82,51 @@ function needsPerSlideCapture(
   return false;
 }
 
+async function exportPageDataDeckToPng(
+  loader: HTMLLoader,
+  inputPath: string,
+  deck: import('./page-data-deck').PageDataDeck,
+  options: ConversionOptions
+): Promise<Buffer[]> {
+  const timeoutMs = options.iframeLoadTimeoutMs ?? 8000;
+  setViewportPixels(deck.canvas.width, deck.canvas.height);
+  const page = await loader.openPreparedPage(inputPath, deck.canvas, {
+    allowLocalResources: options.allowLocalResources ?? true,
+    resourcePolicy: options.resourcePolicy,
+  });
+
+  try {
+    if (!options.quiet) {
+      console.error(
+        `🖼  PNG export: ${deck.pages.length} slides (page-data, ${deck.canvas.width}×${deck.canvas.height})`
+      );
+    }
+    const images: Buffer[] = [];
+    const baseHref = `file://${inputPath.replace(/\\/g, '/')}`;
+    for (const slidePage of deck.pages) {
+      const html = buildPageDataHtml(slidePage, deck.sharedHead, deck.canvas, {
+        baseHref,
+      });
+      await page.setContent(html, {
+        waitUntil: 'domcontentloaded',
+        timeout: timeoutMs,
+      });
+      await page
+        .waitForLoadState('networkidle', { timeout: Math.min(timeoutMs, 10_000) })
+        .catch(() => {});
+      await Promise.race([
+        page.evaluate(() => document.fonts.ready),
+        page.waitForTimeout(2000),
+      ]);
+      await page.waitForTimeout(400);
+      images.push(await captureViewportPng(page, deck.canvas));
+    }
+    return images;
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 async function exportSingleInputToPng(
   loader: HTMLLoader,
   inputPath: string,
@@ -84,6 +135,26 @@ async function exportSingleInputToPng(
   const viewport = resolveConversionViewport(inputPath, options);
   setViewportPixels(viewport.width, viewport.height);
 
+  const autoDetect = options.autoDetectSlides !== false;
+  if (autoDetect && !options.slideSelector?.trim()) {
+    let sourceHtml = '';
+    try {
+      sourceHtml = readFileSync(inputPath, 'utf8');
+    } catch {
+      sourceHtml = '';
+    }
+    const pageDataDeck = sourceHtml
+      ? resolvePageDataDeckFromHtml(sourceHtml, viewport)
+      : null;
+    const canUsePageData =
+      !!pageDataDeck &&
+      (pageDataDeck.source === 'document' ||
+        countTopLevelSlideHosts(sourceHtml) < 2);
+    if (canUsePageData && pageDataDeck) {
+      return exportPageDataDeckToPng(loader, inputPath, pageDataDeck, options);
+    }
+  }
+
   const page = await loader.loadHTML(inputPath, viewport, {
     allowLocalResources: options.allowLocalResources ?? true,
   });
@@ -91,7 +162,6 @@ async function exportSingleInputToPng(
   let iframeDeckDispose: (() => Promise<void>) | undefined;
   try {
     let inspector = new ElementInspector(page);
-    const autoDetect = options.autoDetectSlides !== false;
     let discovery = await inspector.discoverSlideContainers(
       options.slideSelector,
       autoDetect

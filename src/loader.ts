@@ -279,6 +279,38 @@ export class HTMLLoader {
     return page;
   }
 
+  /**
+   * Open a blank page with viewport + anime hooks + resource policy.
+   * Caller owns setContent / navigation and must close the page.
+   */
+  async openPreparedPage(
+    inputPathForPolicy: string,
+    viewport?: { width: number; height: number },
+    options?: {
+      allowLocalResources?: boolean;
+      resourcePolicy?: import('./utils/resource-policy').ResourcePolicy;
+      diagnostics?: import('./utils/resource-policy').ResourceDiagnostic[];
+    }
+  ): Promise<Page> {
+    if (!this.browser) {
+      throw new Error('Browser not initialized. Call init() first.');
+    }
+
+    const page = await this.browser.newPage();
+    const w = viewport?.width ?? getSlideWidthPx();
+    const h = viewport?.height ?? getSlideHeightPx();
+    await page.setViewportSize({ width: w, height: h });
+    await installAnimeInterceptor(page);
+
+    await setupResourcePolicyOnPage(page, inputPathForPolicy, {
+      allowLocalResources: options?.allowLocalResources,
+      policy: options?.resourcePolicy,
+      diagnostics: options?.diagnostics,
+    });
+
+    return page;
+  }
+
   private async prepareLoadedPage(
     page: Page,
     inputPath: string,
